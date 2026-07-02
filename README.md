@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Ryu-CZ/pi-reasoning-zip/main/media/banner.webp" alt="pi-reasoning-zip banner" />
+</p>
+
 # pi-reasoning-zip
 
 Compress new Pi-visible assistant `thinking` blocks into compact reasoning traces before they are stored in the session.

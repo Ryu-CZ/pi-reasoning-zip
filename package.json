@@ -9,6 +9,7 @@
   "files": [
     "dist",
     "scripts",
+    "media",
     "README.md",
     "DESIGN.md",
     "IMPLEMENTATION_PLAN.md",
@@ -34,6 +35,7 @@
   "pi": {
     "extensions": [
       "dist/index.js"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/Ryu-CZ/pi-reasoning-zip/main/media/banner.webp"
   }
 }
