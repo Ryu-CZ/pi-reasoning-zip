@@ -28,3 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reworked README structure to match the concise Pi package style used by sibling packages.
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
+
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/releases/tag/v0.1.0
