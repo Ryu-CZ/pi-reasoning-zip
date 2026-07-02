@@ -190,3 +190,62 @@ npm run check
 npm run smoke
 npm pack --dry-run
 ```
+
+## Release checklist
+
+1. Update the version in `package.json` and `package-lock.json`.
+
+   ```bash
+   npm version <patch|minor|major> --no-git-tag-version
+   ```
+
+2. Move completed `CHANGELOG.md` entries from `[Unreleased]` to the new version section.
+
+   ```md
+   ## [Unreleased]
+
+   ## [x.y.z] - YYYY-MM-DD
+   ```
+
+3. Update changelog links at the bottom.
+
+   ```md
+   [Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/vx.y.z...HEAD
+   [x.y.z]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/vprevious...vx.y.z
+   ```
+
+   For the first release, link the version to the release page:
+
+   ```md
+   [0.1.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/releases/tag/v0.1.0
+   ```
+
+4. Verify build, smoke test, package contents, and npm publish metadata.
+
+   ```bash
+   npm run check
+   npm run smoke
+   npm pack --dry-run
+   npm publish --dry-run
+   ```
+
+5. Commit and tag the release.
+
+   ```bash
+   git add package.json package-lock.json CHANGELOG.md
+   git commit -m "chore: release vx.y.z"
+   git tag -a vx.y.z -m "vx.y.z"
+   ```
+
+6. Push branch and tag.
+
+   ```bash
+   git push origin main
+   git push origin vx.y.z
+   ```
+
+7. Publish to npm when ready.
+
+   ```bash
+   npm publish
+   ```
