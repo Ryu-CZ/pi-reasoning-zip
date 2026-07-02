@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Pi package metadata now loads readable source from `./extensions` and ships `src` for transparency.
+- Replaced broad extension hook `any` casts with narrow local structural hook types.
+
+### Added
+
+- Added real compactor timeout abort test.
 
 ## [0.2.0] - 2026-07-02
 

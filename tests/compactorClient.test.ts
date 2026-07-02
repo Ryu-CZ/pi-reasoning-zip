@@ -43,4 +43,26 @@ describe("compactWithOpenAI", () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
+
+  it("rejects when compactor request times out", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      const signal = (init as RequestInit)?.signal;
+      return new Promise((_, reject) => {
+        if (signal?.aborted) reject(new DOMException("The operation was aborted.", "AbortError"));
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const promise = compactWithOpenAI("thinking", settings); // timeoutMs = 1000
+
+    // Attach rejection handler before advancing timers so no unhandled rejection
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(1001);
+    await assertion;
+
+    vi.useRealTimers();
+  });
 });
