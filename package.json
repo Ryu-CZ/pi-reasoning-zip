@@ -6,13 +6,22 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "DESIGN.md", "IMPLEMENTATION_PLAN.md", "CHANGELOG.md", "LICENSE"],
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "DESIGN.md",
+    "IMPLEMENTATION_PLAN.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm test && npm run build",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "smoke": "npm run build && node scripts/smoke-extension.mjs"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
@@ -23,6 +32,8 @@
     "vitest": "^3.2.0"
   },
   "pi": {
-    "extensions": ["dist/index.js"]
+    "extensions": [
+      "dist/index.js"
+    ]
   }
 }

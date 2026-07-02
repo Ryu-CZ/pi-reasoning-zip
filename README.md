@@ -19,9 +19,10 @@ This is a forward-only Pi extension for small-context local models. It does **no
 ```bash
 npm install
 npm run check
+npm run smoke
 ```
 
-`npm run check` runs typecheck, tests, and build.
+`npm run check` runs typecheck, tests, and build. `npm run smoke` builds the package and runs `scripts/smoke-extension.mjs` against the compiled extension with a mock compactor.
 
 For Pi package loading, `package.json` declares:
 
@@ -113,7 +114,17 @@ The extension skips:
 
 It never scans or rewrites previous session entries.
 
-## Manual smoke test
+## Smoke tests
+
+Automated local smoke test:
+
+```bash
+npm run smoke
+```
+
+This loads `dist/index.js`, registers the Pi hooks against a mock extension API, uses a temporary `.pi/settings.json`, mocks the OpenAI-compatible compactor, and verifies thinking compaction plus targeted prompt injection.
+
+Manual Pi smoke test:
 
 1. Start a local llama.cpp/OpenAI-compatible server that can compact text.
 2. Configure `reasoningZip.compactor.baseUrl` and `reasoningZip.compactor.model`.

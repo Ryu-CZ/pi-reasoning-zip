@@ -17,3 +17,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conservative grug-style prompt injection for target provider requests.
 - Vitest coverage for settings, targeting, prompt injection, prompt building, and message transformation.
 - MIT license metadata and license file.
+- Compiled-extension smoke harness for hook registration, compaction, and prompt injection.
