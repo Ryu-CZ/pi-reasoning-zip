@@ -19,7 +19,9 @@
   </a>
 </p>
 
-Compress new Pi-visible assistant `thinking` blocks into compact reasoning traces before they are stored in the session.
+Compress reasoning blocks to keep the context short.
+
+`pi-reasoning-zip` compresses new Pi-visible assistant `thinking` blocks into compact reasoning traces before they are stored in the session.
 
 ```text
 verbose thinking block  ->  facts / decisions / constraints / failed / next

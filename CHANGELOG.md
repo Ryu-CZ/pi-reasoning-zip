@@ -24,3 +24,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Trimmed npm package contents to runtime build, smoke harness, README, changelog, and license only.
 - Reworked README structure to match the concise Pi package style used by sibling packages.
+- Added package motto to README.
