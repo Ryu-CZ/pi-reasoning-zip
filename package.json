@@ -8,11 +8,8 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "scripts",
-    "media",
+    "scripts/smoke-extension.mjs",
     "README.md",
-    "DESIGN.md",
-    "IMPLEMENTATION_PLAN.md",
     "CHANGELOG.md",
     "LICENSE"
   ],

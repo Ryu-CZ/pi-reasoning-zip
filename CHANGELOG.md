@@ -19,3 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MIT license metadata and license file.
 - Compiled-extension smoke harness for hook registration, compaction, and prompt injection.
 - GitHub/package banner image metadata.
+
+### Changed
+
+- Trimmed npm package contents to runtime build, smoke harness, README, changelog, and license only.
