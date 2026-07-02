@@ -71,4 +71,14 @@ describe("extension entrypoint", () => {
     const skipped = handler({ provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
     expect(skipped).toBeUndefined();
   });
+
+  it("before_provider_request can target the real Pi ctx.model provider shape", async () => {
+    const cwd = await tempProject({ mode: "llama-only" });
+    const handler = loadExtension().get("before_provider_request")!;
+    const injected = handler(
+      { type: "before_provider_request", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd, model: { provider: "llama-server=http://127.0.0.1:7484" } },
+    );
+    expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+  });
 });

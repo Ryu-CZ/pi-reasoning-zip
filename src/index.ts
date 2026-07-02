@@ -13,6 +13,7 @@ import type { PiMessage } from "./types.js";
 
 interface HookContext {
   cwd?: string;
+  model?: { provider?: string };
 }
 
 interface MessageEndEvent {
@@ -64,9 +65,10 @@ function readRawSettings(cwd: string | undefined): unknown {
   return readSettingsSection(projectSettingsPath(cwd)) ?? readSettingsSection(globalSettingsPath());
 }
 
-function eventProvider(event: BeforeProviderRequestEvent): string | undefined {
+function eventProvider(event: BeforeProviderRequestEvent, ctx: HookContext): string | undefined {
   if (typeof event.message?.provider === "string") return event.message.provider;
   if (typeof event.provider === "string") return event.provider;
+  if (typeof ctx.model?.provider === "string") return ctx.model.provider;
   return undefined;
 }
 
@@ -82,7 +84,7 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
 
   extension.on("before_provider_request", (event, ctx) => {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
-    const nextPayload = injectReasoningZipPrompt(event.payload, eventProvider(event), settings);
+    const nextPayload = injectReasoningZipPrompt(event.payload, eventProvider(event, ctx), settings);
     return nextPayload === event.payload ? undefined : nextPayload;
   });
 }
