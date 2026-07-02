@@ -1,0 +1,26 @@
+{
+  "name": "pi-reasoning-zip",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md", "DESIGN.md", "IMPLEMENTATION_PLAN.md", "CHANGELOG.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run typecheck && npm test && npm run build",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.3",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  },
+  "pi": {
+    "extensions": ["dist/index.js"]
+  }
+}

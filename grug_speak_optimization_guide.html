@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grug-Speak Local Optimization Guide</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm 12mm;
+            background-color: #fafbfc;
+        }
+        
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10.5pt;
+            line-height: 1.5;
+            color: #2c3e50;
+            background-color: #fafbfc;
+        }
+        
+        .header-banner {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: #ffffff;
+            margin: -15mm -12mm 20px -12mm;
+            padding: 25px 12mm;
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        .header-banner h1 {
+            margin: 0;
+            font-size: 18pt;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .header-banner p {
+            margin: 5px 0 0 0;
+            font-size: 10pt;
+            color: #94a3b8;
+        }
+        
+        h2 {
+            font-size: 13.5pt;
+            color: #1e293b;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            padding-left: 8px;
+            border-left: 4px solid #3b82f6;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            font-size: 11.5pt;
+            color: #334155;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            page-break-after: avoid;
+        }
+        
+        p {
+            margin: 0 0 10px 0;
+        }
+        
+        ul {
+            margin: 0 0 15px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 4px;
+        }
+        
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background-color: #f1f5f9;
+            color: #b91c1c;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 9.5pt;
+        }
+        
+        pre {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 9.5pt;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 10px 0 15px 0;
+            border: 1px solid #334155;
+            page-break-inside: avoid;
+        }
+        
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+        
+        .table-container {
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+        }
+        
+        th, td {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #334155;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        
+        .math {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-banner">
+        <h1>Grug-Speak Local Optimization Guide</h1>
+        <p>Configuring LLM Token Efficiency & Context Architecture for Local Hardware (RTX 4090 / llama.cpp)</p>
+    </div>
+
+    <h2>1. The Token Efficiency Challenge</h2>
+    <p>OpenAI architectures optimize latency and token expenses by modifying how internal layers "talk" to themselves during deliberation. Rather than deploying long, grammatically pristine statements inside processing sequences, token tracking reveals a condensed, keyword-heavy shorthand language.</p>
+    
+    <p>Conversely, baseline open-weight reasoning workflows scale computational demands quadratically (<span class="math">O(n²)</span>) inside traditional context arrays. This document details techniques to port structural optimization pipelines into local environments running via <code>llama.cpp</code>.</p>
+
+    <h2>2. Architectural Landscape: OpenAI vs. Qwen 3.6</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric / Vector</th>
+                    <th>OpenAI Frameworks</th>
+                    <th>Qwen 3.6 Engineering</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Primary Strategy</strong></td>
+                    <td>Data Compaction (Token reduction)</td>
+                    <td>Architectural Optimization (Linear Layers)</td>
+                </tr>
+                <tr>
+                    <td><strong>Internal Dialect</strong></td>
+                    <td>Terse, fragmented shorthand ("Grug-speak")</td>
+                    <td>Structured, human-readable logic tracks</td>
+                </tr>
+                <tr>
+                    <td><strong>Scaling Complexity</strong></td>
+                    <td>Dense Compute Matrixing</td>
+                    <td>Hybrid Linear Attention (<span class="math">O(n)</span> Scaling)</td>
+                </tr>
+                <tr>
+                    <td><strong>Context Retainment</strong></td>
+                    <td>Server-side state syncing & compaction</td>
+                    <td>Explicit <code>preserve_thinking</code> structures</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>3. Implementation: System Prompt Injection</h2>
+    <p>To drop baseline chatter and eliminate corporate conversation blocks, send this as the request system prompt. Current <code>llama-server</code> does <strong>not</strong> accept <code>--system-prompt</code> as a launch flag; pass the system prompt through the API request instead.</p>
+
+    <pre><code>You are Grug. Grug code simple. Grug output clean. 
+Save token, save world. Follow rules strictly:
+
+1. No "Sure, I can help with that!" No conversational fluff or polite filler.
+2. Do not repeat user question. Do not explain obvious things.
+3. If user ask for code, give ONLY code. Use code blocks. No intro, no outro text.
+4. If text needed, use short bullet points or broken sentences. Avoid big words. 
+5. Cut explanations unless user explicitly ask "why". 
+6. Keep markdown structure minimal.
+
+Think hard, output few tokens. Start now.</code></pre>
+
+    <h3>OpenAI-compatible Chat Completions</h3>
+    <pre><code>curl http://127.0.0.1:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "grug-qwen",
+    "messages": [
+      {"role": "system", "content": "You are Grug. Grug code simple. Grug output clean. Save token, save world. Think hard, output few tokens."},
+      {"role": "user", "content": "Write a small sorting helper."}
+    ],
+    "max_tokens": 512
+  }'</code></pre>
+
+    <h3>OpenAI-compatible Responses API</h3>
+    <pre><code>{
+  "model": "grug-qwen",
+  "instructions": "You are Grug. Grug code simple. Grug output clean. Save token, save world. Think hard, output few tokens.",
+  "input": "Write a small sorting helper.",
+  "max_output_tokens": 512
+}</code></pre>
+
+    <h3>Anthropic-compatible Messages API</h3>
+    <pre><code>{
+  "model": "grug-qwen",
+  "system": "You are Grug. Grug code simple. Grug output clean. Save token, save world. Think hard, output few tokens.",
+  "messages": [
+    {"role": "user", "content": "Write a small sorting helper."}
+  ],
+  "max_tokens": 512
+}</code></pre>
+
+    <h2>4. Engine Flags for RTX 4090 Setup</h2>
+    <p>Because you are leveraging an <strong>RTX 4090</strong> along with an Unsloth dynamic quantization layout, maximize your multi-token prediction arrays and runtime limits via these specific launch arguments:</p>
+
+    <h3>Multi-Token Prediction Decoding</h3>
+    <p>To run speculative execution passes over future validation elements, hook into the parallel prediction engine:</p>
+    <pre><code>--spec-type draft-mtp --spec-draft-n-max 2</code></pre>
+
+    <h3>Runtime State Cap & Truncation</h3>
+    <p>Enforce clean context caching boundaries and limit runaway trailing parameters with these variable definitions:</p>
+    <ul>
+        <li><code>-n 256</code> or <code>-n 512</code>: Instantly clips generation once payload criteria match.</li>
+        <li><strong>Reasoning Bypass:</strong> If reasoning parameters waste processing time on simple coding queries, disable thinking with the current llama.cpp flag:
+            <pre><code>--reasoning off --reasoning-budget 0 --no-reasoning-preserve</code></pre>
+        </li>
+        <li><strong>Reasoning Cap:</strong> If context deep-dives are required but structural limits must stay tight, enable thinking and allocate a strict window:
+            <pre><code>--reasoning on --reasoning-budget 512</code></pre>
+        </li>
+    </ul>
+
+</body>
+</html>
