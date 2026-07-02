@@ -44,12 +44,13 @@ npm run check
 npm run smoke
 ```
 
-For local development you can also load the built extension directly:
+For local development you can also load the readable source extension directly:
 
 ```bash
-npm run build
-pi -e ./dist/index.js
+pi -e ./extensions
 ```
+
+The npm library entrypoint still builds to `dist/index.js`, but Pi package metadata points at `./extensions` so Pi can inspect the source it loads.
 
 ## Features
 
@@ -188,6 +189,7 @@ npm test
 npm run build
 npm run check
 npm run smoke
+pi -e ./extensions --no-extensions --offline --list-models
 npm pack --dry-run
 ```
 
@@ -220,11 +222,12 @@ npm pack --dry-run
    [0.1.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/releases/tag/v0.1.0
    ```
 
-4. Verify build, smoke test, package contents, and npm publish metadata.
+4. Verify build, source-extension load, smoke test, package contents, and npm publish metadata.
 
    ```bash
    npm run check
    npm run smoke
+   pi -e ./extensions --no-extensions --offline --list-models
    npm pack --dry-run
    npm publish --dry-run
    ```

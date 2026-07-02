@@ -1,6 +1,6 @@
 {
   "name": "pi-reasoning-zip",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Compact reasoning blocks to keep the context short.",
   "license": "MIT",
@@ -10,6 +10,8 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
+    "src",
+    "extensions",
     "scripts/smoke-extension.mjs",
     "README.md",
     "CHANGELOG.md",
@@ -57,7 +59,7 @@
   },
   "pi": {
     "extensions": [
-      "dist/index.js"
+      "./extensions"
     ],
     "image": "https://raw.githubusercontent.com/Ryu-CZ/pi-reasoning-zip/main/media/banner.webp"
   },
