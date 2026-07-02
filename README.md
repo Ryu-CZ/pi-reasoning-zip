@@ -4,45 +4,75 @@
 
 # pi-reasoning-zip
 
+<p>
+  <a href="https://www.npmjs.com/package/pi-reasoning-zip">
+    <img src="https://img.shields.io/npm/v/pi-reasoning-zip" alt="npm version">
+  </a>
+  <a href="https://www.npmjs.com/package/pi-reasoning-zip">
+    <img src="https://img.shields.io/npm/dt/pi-reasoning-zip" alt="npm downloads">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/npm/l/pi-reasoning-zip" alt="license">
+  </a>
+  <a href="https://pi.dev/packages/pi-reasoning-zip">
+    <img src="https://img.shields.io/badge/pi-package-1a1a2e" alt="pi package">
+  </a>
+</p>
+
 Compress new Pi-visible assistant `thinking` blocks into compact reasoning traces before they are stored in the session.
 
-This is a forward-only Pi extension for small-context local models. It does **not** rewrite old sessions and does **not** mutate replayed context at `context` time.
+```text
+verbose thinking block  ->  facts / decisions / constraints / failed / next
+```
 
-## MVP behavior
+Use this when local models expose long reasoning and you want future Pi turns to replay compact traces instead of raw reasoning haystacks.
 
-- Hooks `message_end` for the just-finalized assistant message.
-- Finds plain Pi message blocks shaped like `{ "type": "thinking", "thinking": "..." }`.
-- For eligible long blocks, calls a configured local OpenAI-compatible compactor endpoint directly.
-- Replaces only eligible `thinking` text with the compact trace.
-- Preserves text blocks, tool calls, block order, and assistant metadata.
-- Fails open: on target mismatch, timeout, HTTP error, malformed compactor output, or unsafe metadata, the original message/block is returned unchanged.
-- Optionally hooks `before_provider_request` for local target providers and injects a marked grug-style instruction to keep visible reasoning terse.
-
-## Install / build
+## Install
 
 ```bash
+# From npm, after publish
+pi install npm:pi-reasoning-zip
+
+# From git
+pi install git:github.com/Ryu-CZ/pi-reasoning-zip
+
+# Development
 npm install
 npm run check
 npm run smoke
 ```
 
-`npm run check` runs typecheck, tests, and build. `npm run smoke` builds the package and runs `scripts/smoke-extension.mjs` against the compiled extension with a mock compactor.
+For local development you can also load the built extension directly:
 
-For Pi package loading, `package.json` declares:
-
-```json
-{
-  "pi": {
-    "extensions": ["dist/index.js"]
-  }
-}
+```bash
+npm run build
+pi -e ./dist/index.js
 ```
 
-During local development you can also load the built extension path directly from Pi if desired.
+## Features
+
+- **Forward-only compaction** — modifies only the new assistant message being finalized.
+- **Stored compact traces** — future turns naturally replay compact `thinking` because that is what Pi stored.
+- **Local compactor** — calls a configured OpenAI-compatible `/chat/completions` endpoint directly.
+- **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
+- **Prompt minimization** — optional grug-style request injection for target local providers.
+- **Fail-open safety** — preserves original messages on errors, timeouts, invalid output, or unknown payloads.
+- **Opaque reasoning guard** — skips signed/encrypted/provider-opaque reasoning metadata.
+
+## Commands
+
+None.
+
+`pi-reasoning-zip` works through Pi lifecycle hooks:
+
+| Hook | Purpose |
+|---|---|
+| `message_end` | Compact eligible new assistant `thinking` blocks before storage |
+| `before_provider_request` | Optionally inject terse-reasoning guidance for target local providers |
 
 ## Configuration
 
-Put configuration in project `.pi/settings.json` or global `~/.pi/agent/settings.json`. Project settings take precedence.
+Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.json` under the `reasoningZip` key. Project settings take precedence.
 
 ```json
 {
@@ -70,15 +100,19 @@ Put configuration in project `.pi/settings.json` or global `~/.pi/agent/settings
 
 ### Modes
 
-- `llama-only` — compact only llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
-- `local-only` — compact local URL providers and llama.cpp-like providers.
-- `all` — compact any eligible plain Pi `thinking` block, while still skipping signed/encrypted/opaque blocks.
-- `disabled` — no-op.
+| Mode | Behavior |
+|---|---|
+| `llama-only` | Compact llama.cpp-like providers only |
+| `local-only` | Compact local URL providers and llama.cpp-like providers |
+| `all` | Compact any eligible plain Pi `thinking` block |
+| `disabled` | No-op |
 
 ### Storage modes
 
-- `compact-new` — compact new assistant thinking before storage.
-- `off` — do not alter assistant messages.
+| Storage mode | Behavior |
+|---|---|
+| `compact-new` | Compact new assistant thinking before storage |
+| `off` | Do not alter assistant messages |
 
 ## Compactor endpoint
 
@@ -88,7 +122,7 @@ The compactor must expose an OpenAI-compatible chat completions endpoint:
 POST {baseUrl}/chat/completions
 ```
 
-The extension sends the original thinking to the compactor and expects terse output like:
+The extension asks the compactor to produce terse output like:
 
 ```text
 facts:
@@ -103,20 +137,25 @@ next:
 - ...
 ```
 
-Output `none` means no useful trace remains and the original block is preserved.
+If the compactor returns `none`, empty output, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
 
-## Safety limits
+## Safety model
 
-The extension skips:
+This extension does **not**:
+
+- rewrite previous sessions
+- backfill older entries in the current session
+- mutate replayed context with the `context` hook
+- claim to reduce hidden provider-side reasoning tokens
+- touch signed, encrypted, or opaque provider reasoning metadata
+
+It skips:
 
 - non-assistant messages
 - messages without array content
 - short thinking below `thresholds.minChars`
-- signed/encrypted/opaque reasoning metadata (`signature`, `reasoning_signature`, `encrypted_content`, `reasoning_details`)
 - unknown providers by default in `llama-only`
 - hosted/non-local providers in `local-only`
-
-It never scans or rewrites previous session entries.
 
 ## Smoke tests
 
@@ -135,6 +174,17 @@ Manual Pi smoke test:
 3. Enable `mode: "llama-only"` and use a llama.cpp provider in Pi.
 4. Ask a prompt that produces long visible reasoning/thinking.
 5. Inspect the session JSONL.
-6. Confirm the new assistant message contains compact `thinking` rather than raw verbose reasoning.
+6. Confirm the new assistant message contains compact `thinking`, not raw verbose reasoning.
 7. Confirm older session entries were not changed.
 8. Send another prompt and confirm Pi replays the compact trace because that is what was stored.
+
+## Development
+
+```bash
+npm run typecheck
+npm test
+npm run build
+npm run check
+npm run smoke
+npm pack --dry-run
+```
