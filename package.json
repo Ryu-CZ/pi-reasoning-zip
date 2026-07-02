@@ -1,10 +1,12 @@
 {
   "name": "pi-reasoning-zip",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Ryu-CZ <thandeus@gmail.com> (https://github.com/Ryu-CZ)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "README.md", "DESIGN.md", "IMPLEMENTATION_PLAN.md", "CHANGELOG.md"],
+  "files": ["dist", "README.md", "DESIGN.md", "IMPLEMENTATION_PLAN.md", "CHANGELOG.md", "LICENSE"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
