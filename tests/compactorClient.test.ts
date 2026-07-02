@@ -30,6 +30,23 @@ describe("compactWithOpenAI", () => {
     await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("Compactor HTTP 500");
   });
 
+  it("retries without llama-specific thinking flag when endpoint rejects it", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: false, status: 400 } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+      } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).resolves.toBe("zip");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
+    expect(firstBody.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(secondBody.chat_template_kwargs).toBeUndefined();
+  });
+
   it("throws on missing content", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json: async () => ({ choices: [{}] }) } as Response);
     await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("missing message content");

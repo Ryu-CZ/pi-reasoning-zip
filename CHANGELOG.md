@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added strict-endpoint fallback retry for compactor requests that reject `chat_template_kwargs`.
+
 ## [0.2.2] - 2026-07-03
 
 ### Changed

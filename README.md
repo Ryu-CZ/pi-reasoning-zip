@@ -125,7 +125,7 @@ The compactor must expose an OpenAI-compatible chat completions endpoint:
 POST {baseUrl}/chat/completions
 ```
 
-The extension sends `chat_template_kwargs: { "enable_thinking": false }` so llama.cpp/Qwen-style compactor calls return the compact trace in `message.content` instead of spending tokens on compactor-side reasoning.
+The extension first sends `chat_template_kwargs: { "enable_thinking": false }` so llama.cpp/Qwen-style compactor calls return the compact trace in `message.content` instead of spending tokens on compactor-side reasoning. If a stricter OpenAI-compatible endpoint rejects that extra field with HTTP 400/422, the request is retried once without it.
 
 The extension asks the compactor to produce terse output like:
 
