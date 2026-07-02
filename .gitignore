@@ -23,3 +23,9 @@ pnpm-debug.log*
 .vscode/
 *.swp
 *.swo
+
+# Local-only project notes
+DESIGN.md
+IMPLEMENTATION_PLAN.md
+grug_speak_optimization_guide.html
+Grug_Speak_Local_Optimization_Guide_Expanded-sysprompt.html
