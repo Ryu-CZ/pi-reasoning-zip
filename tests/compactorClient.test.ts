@@ -22,6 +22,7 @@ describe("compactWithOpenAI", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.model).toBe("zip");
     expect(body.messages[1].content).toContain("original thinking");
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
   });
 
   it("throws on HTTP error", async () => {

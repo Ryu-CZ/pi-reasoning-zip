@@ -19,6 +19,7 @@ export async function compactWithOpenAI(thinking: string, settings: ReasoningZip
         ],
         max_tokens: settings.compactor.maxTokens,
         temperature: settings.compactor.temperature,
+        chat_template_kwargs: { enable_thinking: false },
       }),
       signal: controller.signal,
     });

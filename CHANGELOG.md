@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added real compactor timeout abort test.
 
+### Fixed
+
+- Disabled compactor-side Qwen/llama.cpp thinking via `chat_template_kwargs.enable_thinking=false` so compact traces are returned in `message.content`.
+
 ## [0.2.0] - 2026-07-02
 
 ### Added
