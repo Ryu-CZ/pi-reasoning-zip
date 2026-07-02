@@ -7,11 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-07-02
+## [0.2.2] - 2026-07-03
 
 ### Changed
 
-- Pi package metadata now loads readable source from `./extensions` and ships `src` for transparency.
 - Replaced broad extension hook `any` casts with narrow local structural hook types.
 
 ### Added
@@ -21,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Disabled compactor-side Qwen/llama.cpp thinking via `chat_template_kwargs.enable_thinking=false` so compact traces are returned in `message.content`.
+
+## [0.2.1] - 2026-07-02
+
+### Changed
+
+- Pi package metadata now loads readable source from `./extensions` and ships `src` for transparency.
 
 ## [0.2.0] - 2026-07-02
 
@@ -54,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/releases/tag/v0.1.0
