@@ -1,8 +1,8 @@
 {
   "name": "pi-reasoning-zip",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
-  "description": "Compress reasoning blocks to keep the context short.",
+  "description": "Compact reasoning blocks to keep the context short.",
   "license": "MIT",
   "author": "Ryu-CZ <thandeus@gmail.com> (https://github.com/Ryu-CZ)",
   "type": "module",
