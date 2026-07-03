@@ -22,7 +22,21 @@ describe("compactWithOpenAI", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.model).toBe("zip");
     expect(body.messages[1].content).toContain("original thinking");
+    expect(body.messages[1].content).toContain("Compression role: grug");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+  });
+
+  it("passes configured compression role into the compaction prompt", async () => {
+    const customSettings = resolveReasoningZipSettings({ compressionRole: "ultra-grug", compactor: { baseUrl: "http://local.test/v1", model: "zip", apiKey: "key" } });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+
+    await compactWithOpenAI("thinking", customSettings);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.messages[1].content).toContain("Compression role: ultra-grug");
   });
 
   it("throws on HTTP error", async () => {

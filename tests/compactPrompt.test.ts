@@ -6,6 +6,19 @@ describe("buildCompactionPrompt", () => {
     const prompt = buildCompactionPrompt("exact/path.ts and command npm test");
     expect(prompt).toContain("exact/path.ts and command npm test");
     expect(prompt).toContain("facts, decisions, constraints, failed, next");
+    expect(prompt).toContain("Compression role: grug");
     expect(prompt).toContain("output exactly: none");
+  });
+
+  it("uses balanced role instructions", () => {
+    const prompt = buildCompactionPrompt("thinking", "balanced");
+    expect(prompt).toContain("Compression role: balanced");
+    expect(prompt).toContain("keep enough context");
+  });
+
+  it("uses ultra-grug role instructions", () => {
+    const prompt = buildCompactionPrompt("thinking", "ultra-grug");
+    expect(prompt).toContain("Compression role: ultra-grug");
+    expect(prompt).toContain("Compress hard");
   });
 });

@@ -27,7 +27,7 @@ Compress reasoning blocks to keep the context short.
 verbose thinking block  ->  facts / decisions / constraints / failed / next
 ```
 
-Use this when local models expose long reasoning and you want future Pi turns to replay compact traces instead of raw reasoning haystacks.
+Use this when local models expose long reasoning and you want future Pi turns to replay compact traces instead of raw reasoning as verbose prose.
 
 ## Install
 
@@ -83,6 +83,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     "enabled": true,
     "mode": "llama-only",
     "storageMode": "compact-new",
+    "compressionRole": "grug",
     "injectPrompt": true,
     "compactor": {
       "baseUrl": "http://127.0.0.1:7484/v1",
@@ -94,7 +95,6 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     },
     "thresholds": {
       "minChars": 1000,
-      "targetRatio": 0.15,
       "maxTraceChars": 2000
     }
   }
@@ -116,6 +116,14 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
 |---|---|
 | `compact-new` | Compact new assistant thinking before storage |
 | `off` | Do not alter assistant messages |
+
+### Compression roles
+
+| Role | Behavior |
+|---|---|
+| `balanced` | concise bullets while preserving extra context |
+| `grug` | terse, keyword-heavy default |
+| `ultra-grug` | most aggressive fragment-style trace |
 
 ## Compactor endpoint
 
@@ -142,7 +150,7 @@ next:
 - ...
 ```
 
-If the compactor returns `none`, empty output, output above `thresholds.targetRatio` of the original length, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
+The configured `compressionRole` guides the compactor's terse style. If the compactor returns `none`, empty output, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
 
 ## Safety model
 

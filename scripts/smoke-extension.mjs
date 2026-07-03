@@ -15,7 +15,7 @@ try {
     JSON.stringify({
       reasoningZip: {
         mode: "llama-only",
-        thresholds: { minChars: 5, targetRatio: 1, maxTraceChars: 100 },
+        thresholds: { minChars: 5, maxTraceChars: 100 },
         compactor: { baseUrl: "http://mock.local/v1", model: "mock", timeoutMs: 1000 },
       },
     }),

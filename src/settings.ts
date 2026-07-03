@@ -1,9 +1,10 @@
-import type { ReasoningZipMode, ReasoningZipSettings, ReasoningZipStorageMode } from "./types.js";
+import type { ReasoningZipCompressionRole, ReasoningZipMode, ReasoningZipSettings, ReasoningZipStorageMode } from "./types.js";
 
 export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   enabled: true,
   mode: "llama-only",
   storageMode: "compact-new",
+  compressionRole: "grug",
   injectPrompt: true,
   compactor: {
     baseUrl: "http://127.0.0.1:7484/v1",
@@ -15,13 +16,13 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   },
   thresholds: {
     minChars: 1000,
-    targetRatio: 0.15,
     maxTraceChars: 2000,
   },
 };
 
 const modes = new Set<ReasoningZipMode>(["llama-only", "local-only", "all", "disabled"]);
 const storageModes = new Set<ReasoningZipStorageMode>(["compact-new", "off"]);
+const compressionRoles = new Set<ReasoningZipCompressionRole>(["balanced", "grug", "ultra-grug"]);
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -48,11 +49,15 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
   const storageMode = storageModes.has(root.storageMode as ReasoningZipStorageMode)
     ? (root.storageMode as ReasoningZipStorageMode)
     : DEFAULT_SETTINGS.storageMode;
+  const compressionRole = compressionRoles.has(root.compressionRole as ReasoningZipCompressionRole)
+    ? (root.compressionRole as ReasoningZipCompressionRole)
+    : DEFAULT_SETTINGS.compressionRole;
 
   return {
     enabled: booleanValue(root.enabled, DEFAULT_SETTINGS.enabled),
     mode,
     storageMode,
+    compressionRole,
     injectPrompt: booleanValue(root.injectPrompt, DEFAULT_SETTINGS.injectPrompt),
     compactor: {
       baseUrl: stringValue(compactor.baseUrl, DEFAULT_SETTINGS.compactor.baseUrl).replace(/\/$/, ""),
@@ -64,7 +69,6 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
     },
     thresholds: {
       minChars: numberValue(thresholds.minChars, DEFAULT_SETTINGS.thresholds.minChars, 0),
-      targetRatio: numberValue(thresholds.targetRatio, DEFAULT_SETTINGS.thresholds.targetRatio, 0),
       maxTraceChars: numberValue(thresholds.maxTraceChars, DEFAULT_SETTINGS.thresholds.maxTraceChars, 1),
     },
   };

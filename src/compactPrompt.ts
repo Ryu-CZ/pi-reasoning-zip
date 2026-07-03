@@ -1,10 +1,18 @@
-export function buildCompactionPrompt(thinking: string): string {
+import type { ReasoningZipCompressionRole } from "./types.js";
+
+const ROLE_INSTRUCTIONS: Record<ReasoningZipCompressionRole, string> = {
+  balanced: "Compression role: balanced. Use concise bullets, but keep enough context that another coding agent can continue without guessing.",
+  grug: "Compression role: grug. Few words. Keyword-heavy. No prose. Keep only useful state for the next coding turn.",
+  "ultra-grug": "Compression role: ultra-grug. Compress hard. Fragment bullets only. Symbols and exact names over sentences. Keep only critical state.",
+};
+
+export function buildCompactionPrompt(thinking: string, compressionRole: ReasoningZipCompressionRole = "grug"): string {
   return `Compress this model reasoning into a compact decision trace for future coding-agent context.
 
 Keep exact paths, commands, symbols, errors, decisions, constraints, failed attempts, and next actions.
 Drop self-talk, repeated planning, obvious reasoning, filler, and prose.
 Use terse bullets under: facts, decisions, constraints, failed, next.
-Target 10-20% of original length.
+${ROLE_INSTRUCTIONS[compressionRole]}
 If no useful content remains, output exactly: none
 
 Reasoning:
