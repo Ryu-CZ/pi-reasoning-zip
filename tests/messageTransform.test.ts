@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compactAssistantMessage } from "../src/messageTransform.js";
 import { resolveReasoningZipSettings } from "../src/settings.js";
 
-const settings = resolveReasoningZipSettings({ thresholds: { minChars: 5, maxTraceChars: 100 }, mode: "all" });
+const settings = resolveReasoningZipSettings({ thresholds: { minChars: 5, targetRatio: 1, maxTraceChars: 100 }, mode: "all" });
 
 describe("compactAssistantMessage", () => {
   it("compacts long thinking", async () => {
@@ -59,6 +59,43 @@ describe("compactAssistantMessage", () => {
     expect(result.changed).toBe(false);
   });
 
+  it("rejects output above target ratio", async () => {
+    const ratioSettings = resolveReasoningZipSettings({ thresholds: { minChars: 5, targetRatio: 0.25, maxTraceChars: 100 }, mode: "all" });
+    const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrst" }] };
+    const result = await compactAssistantMessage(message, ratioSettings, async () => "123456");
+    expect(result.changed).toBe(false);
+    expect(result.message).toBe(message);
+  });
+
+  it("accepts output within target ratio", async () => {
+    const ratioSettings = resolveReasoningZipSettings({ thresholds: { minChars: 5, targetRatio: 0.25, maxTraceChars: 100 }, mode: "all" });
+    const result = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrst" }] },
+      ratioSettings,
+      async () => "12345",
+    );
+    expect(result.changed).toBe(true);
+    expect((result.message.content as any[])[0].thinking).toBe("12345");
+  });
+
+  it("uses default target ratio", async () => {
+    const defaultRatioSettings = resolveReasoningZipSettings({ thresholds: { minChars: 5, maxTraceChars: 100 }, mode: "all" });
+    const rejected = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrst" }] },
+      defaultRatioSettings,
+      async () => "1234",
+    );
+    expect(rejected.changed).toBe(false);
+
+    const accepted = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrst" }] },
+      defaultRatioSettings,
+      async () => "123",
+    );
+    expect(accepted.changed).toBe(true);
+    expect((accepted.message.content as any[])[0].thinking).toBe("123");
+  });
+
   it("skips user, tool, and custom messages", async () => {
     for (const role of ["user", "tool", undefined]) {
       const message = { role, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
@@ -99,7 +136,15 @@ describe("compactAssistantMessage", () => {
   });
 
   it("skips signed/encrypted/opaque thinking metadata", async () => {
-    for (const metadata of [{ signature: "sig" }, { reasoning_signature: "sig" }, { encrypted_content: "opaque" }, { reasoning_details: [] }]) {
+    for (const metadata of [
+      { signature: "sig" },
+      { reasoning_signature: "sig" },
+      { thinkingSignature: "sig" },
+      { thinkingSignature: "" },
+      { encrypted_content: "opaque" },
+      { reasoning_details: [] },
+      { redacted: true },
+    ]) {
       const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz", ...metadata }] };
       const result = await compactAssistantMessage(message, settings, async () => "zip");
       expect(result.changed).toBe(false);

@@ -7,6 +7,7 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.mode).toBe("llama-only");
     expect(settings.storageMode).toBe("compact-new");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
+    expect(settings.thresholds.targetRatio).toBe(0.15);
   });
 
   it("merges partial config", () => {
@@ -14,6 +15,7 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.mode).toBe("all");
     expect(settings.compactor.model).toBe("zipper");
     expect(settings.thresholds.minChars).toBe(10);
+    expect(settings.thresholds.targetRatio).toBe(0.15);
     expect(settings.injectPrompt).toBe(true);
   });
 

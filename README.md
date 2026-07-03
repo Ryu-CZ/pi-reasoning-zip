@@ -60,7 +60,7 @@ The npm library entrypoint still builds to `dist/index.js`, but Pi package metad
 - **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
 - **Prompt minimization** — optional grug-style request injection for target local providers.
 - **Fail-open safety** — preserves original messages on errors, timeouts, invalid output, or unknown payloads.
-- **Opaque reasoning guard** — skips signed/encrypted/provider-opaque reasoning metadata.
+- **Opaque reasoning guard** — skips signed, encrypted, signature-bearing, redacted, or provider-opaque reasoning metadata.
 
 ## Commands
 
@@ -142,7 +142,7 @@ next:
 - ...
 ```
 
-If the compactor returns `none`, empty output, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
+If the compactor returns `none`, empty output, output above `thresholds.targetRatio` of the original length, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
 
 ## Safety model
 
@@ -159,6 +159,7 @@ It skips:
 - non-assistant messages
 - messages without array content
 - short thinking below `thresholds.minChars`
+- signature-bearing or redacted thinking blocks
 - unknown providers by default in `llama-only`
 - hosted/non-local providers in `local-only`
 

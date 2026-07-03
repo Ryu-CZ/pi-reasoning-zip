@@ -11,8 +11,10 @@ function hasOpaqueReasoningMetadata(block: PiMessageBlock): boolean {
   return (
     typeof block.signature === "string" ||
     typeof block.reasoning_signature === "string" ||
+    typeof block.thinkingSignature === "string" ||
     typeof block.encrypted_content === "string" ||
-    Array.isArray(block.reasoning_details)
+    Array.isArray(block.reasoning_details) ||
+    block.redacted === true
   );
 }
 
@@ -20,6 +22,7 @@ function acceptableCompaction(original: string, compacted: string, settings: Rea
   const text = compacted.trim();
   if (!text || text === "none") return undefined;
   if (text.length >= original.length) return undefined;
+  if (text.length / original.length > settings.thresholds.targetRatio) return undefined;
   if (text.length > settings.thresholds.maxTraceChars) return undefined;
   return text;
 }

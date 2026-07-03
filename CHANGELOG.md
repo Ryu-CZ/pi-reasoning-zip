@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Skip Pi `thinkingSignature` and redacted thinking blocks instead of rewriting opaque provider metadata.
+- Enforce `thresholds.targetRatio` when accepting compacted thinking output.
+
 ## [0.2.4] - 2026-07-03
 
 ### Fixed
