@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-07-03
+
 ### Changed
 
 - Replaced `thresholds.targetRatio` with `compressionRole` presets for compactor prompt style.
@@ -82,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.2...v0.2.3
