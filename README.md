@@ -21,13 +21,57 @@
 
 Compress reasoning blocks to keep the context short.
 
-`pi-reasoning-zip` compresses new Pi-visible assistant `thinking` blocks into compact reasoning traces before they are stored in the session.
 
-```text
-verbose thinking block  ->  facts / decisions / constraints / failed / next
+## Why
+
+There are `thinking` blocks in your Pi session filling your context window. But there is a major difference between **open** and **closed** models.
+- Hosted providers of **closed models** usually keep full internal reasoning inside the API and expose only final response and summarized opaque `thinking` block. 
+- The _**open reasoning models**_ usually expose the whole `thinking` block to Pi.
+
+`pi-reasoning-zip` compresses _**open reasoning model**_ `thinking` blocks into a caveman-style compact thinking block before they are stored in the session.
+- caveman-ed compaction costs additional tokens but reduces context usage
+- intentional usage of `pi-reasoning-zip` is when your Pi is using local model, in which case your `reasoningZip.compactor` is often the same as your active Pi model
+
+
+```mermaid
+flowchart LR
+   User["User prompt"] --> Pi["Pi context builder"]
+   
+   Pi --> API["Public API"]
+   subgraph Hosted["Private model provider Claude / OpenAI"]
+      API --> Hidden["Hidden internal thinking"]
+      Hidden --> Summary["Opaque summary"]
+      Summary --> Limited["Response with compacted opaque thinking block"]
+   end
+   Limited --> Store["Pi stores exposed output only "]
+   
+   Pi --> OpenAPI["Open API"]
+   subgraph Open["Open model Local / Remote"]
+     OpenAPI --> Public["Model thinking block"]
+     Public --> FullResponse["Response with full thinking block"]
+   end
+   FullResponse --> SimplePiSession["Pi stores response with full thinking block"]
+   FullResponse --> PickThinking["Full thinking block"]
+   Zip --> LocalAPI
+   subgraph Local["Open local model (llama.cpp)"]
+   LocalAPI["Local API"] --> LocalSummary["Cavemaned compacted thinking block"]
+   end
+   LocalSummary --> ZipResponse
+   subgraph extension["pi-reasoning-zip"]
+   PickThinking --> Zip["Apply caveman and compact"]
+   ZipResponse["Response with compact thinking block"]
+   end
+   ZipResponse --> CompactPiSession["Pi stores response with compacted thinking block"]
+   
+
+   
+   classDef local fill:#e3f2ea,stroke:#2f7d5b,color:#20231f;
+   classDef hosted fill:#e9ecfb,stroke:#4c5fb5,color:#20231f;
+   classDef warn fill:#faeadf,stroke:#b35b2d,color:#20231f;
+   class OpenAPI,Public,FullResponse,LocalAPI,LocalSummary local;
+   class API,Hidden,Limited,Summary hosted;
+   class Public,Hidden warn;
 ```
-
-Use this when local models expose long reasoning and you want future Pi turns to replay compact traces instead of raw reasoning as verbose prose.
 
 ## Install
 
