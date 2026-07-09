@@ -236,6 +236,37 @@ Manual Pi smoke test:
 7. Confirm older session entries were not changed.
 8. Send another prompt and confirm Pi replays the compact trace because that is what was stored.
 
+## Local Benchmark
+
+On 2026-07-09, a paired local benchmark ran seven high-thinking Pi tasks against
+`unsloth` on llama.cpp. The same model served both the main Pi task and the
+compactor. All other installed Pi extensions stayed enabled; tools were disabled
+for repeatability. The enabled arm loaded this extension from source, while the
+disabled arm changed only `reasoningZip.enabled`. Temporary Pi settings were
+restored after the run.
+
+The benchmark used `compressionRole: "grug"`, `injectPrompt: false`,
+`minChars: 200`, `maxTraceChars: 2000`, and `compactor.maxTokens: 512` so it
+measured stored-trace compression rather than prompt injection.
+
+| Metric across 7 sessions | Disabled | Enabled | Change |
+|---|---:|---:|---:|
+| Stored thinking characters | 15,242 | 4,631 | -69.6% |
+| Complete session JSONL bytes | 57,902 | 49,317 | -14.8% |
+
+Quality was checked by feeding each of the seven original traces to the same
+local compactor and comparing the result with its source. Six traces compacted
+from 14,593 to 4,642 characters while retaining the task facts, decisions,
+constraints, operational risks, and explicit rollback actions where present.
+The remaining short trace returned `none`; the extension's fail-open rule kept
+the original trace instead of storing an empty summary.
+
+This is a storage benchmark, not a latency benchmark. The compactor makes an
+additional request, and a single-slot llama.cpp server changes its KV-cache
+state between calls. Dynamic context supplied by other extensions can also vary
+between sessions, so provider input-token and response-time counters are not
+directly comparable across the two arms.
+
 ## Development
 
 ```bash

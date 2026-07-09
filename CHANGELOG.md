@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-07-09
+
+### Changed
+
+- Added a required `rollback` section to compaction prompts so reversible actions remain in compact traces.
+
 ## [0.2.7] - 2026-07-09
 
 ### Fixed
@@ -90,7 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.4...v0.2.5
