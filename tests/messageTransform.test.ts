@@ -98,6 +98,16 @@ describe("compactAssistantMessage", () => {
     }
   });
 
+  it("compacts llama.cpp reasoning_content blocks", async () => {
+    const result = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz", thinkingSignature: "reasoning_content" }] },
+      settings,
+      async () => "zip",
+    );
+    expect(result.changed).toBe(true);
+    expect((result.message.content as any[])[0]).toMatchObject({ thinking: "zip", thinkingSignature: "reasoning_content" });
+  });
+
   it("skips signed/encrypted/opaque thinking metadata", async () => {
     for (const metadata of [
       { signature: "sig" },

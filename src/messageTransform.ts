@@ -11,7 +11,9 @@ function hasOpaqueReasoningMetadata(block: PiMessageBlock): boolean {
   return (
     typeof block.signature === "string" ||
     typeof block.reasoning_signature === "string" ||
-    typeof block.thinkingSignature === "string" ||
+    // Pi uses this value as the OpenAI-compatible field name for plain
+    // llama.cpp reasoning, not as an opaque provider signature.
+    (typeof block.thinkingSignature === "string" && block.thinkingSignature !== "reasoning_content") ||
     typeof block.encrypted_content === "string" ||
     Array.isArray(block.reasoning_details) ||
     block.redacted === true
