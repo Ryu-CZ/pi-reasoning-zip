@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `/reasoning-zip` Pi command to inspect, enable, disable, or toggle `reasoningZip.enabled` in project or global settings.
+- Added configurable footer status while `reasoningZip.enabled` is active; global `reasoningZip.footerStatus` defaults to `🗜️ Zip`.
+
 ## [0.2.9] - 2026-07-10
 
 ### Fixed

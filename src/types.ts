@@ -8,6 +8,7 @@ export interface ReasoningZipSettings {
   storageMode: ReasoningZipStorageMode;
   compressionRole: ReasoningZipCompressionRole;
   injectPrompt: boolean;
+  footerStatus: string;
   compactor: {
     baseUrl: string;
     model: string;

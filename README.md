@@ -74,7 +74,16 @@ The npm library entrypoint still builds to `dist/index.js`, but Pi package metad
 
 ## Commands
 
-None.
+`pi-reasoning-zip` registers a Pi command for toggling the `reasoningZip.enabled` setting:
+
+```text
+/reasoning-zip status
+/reasoning-zip enable [global|project]
+/reasoning-zip disable [global|project]
+/reasoning-zip toggle [global|project]
+```
+
+Without an explicit scope, writes update the nearest existing `reasoningZip` settings section, falling back to global Pi settings. The extension rereads settings for each hook call, so enable/disable affects subsequent compaction and prompt-injection events. When enabled, Pi's footer shows `reasoningZip.footerStatus` from global settings, defaulting to `🗜️ Zip`.
 
 `pi-reasoning-zip` works through Pi lifecycle hooks:
 
@@ -95,6 +104,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     "storageMode": "compact-new",
     "compressionRole": "grug",
     "injectPrompt": true,
+    "footerStatus": "🗜️ Zip",
     "compactor": {
       "baseUrl": "http://127.0.0.1:7484/v1",
       "model": "unsloth",
@@ -110,6 +120,8 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
   }
 }
 ```
+
+`footerStatus` is read from global settings only; project settings can still control compaction behavior.
 
 ### Modes
 
