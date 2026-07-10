@@ -1,6 +1,6 @@
 {
   "name": "pi-reasoning-zip",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "private": false,
   "description": "Compact reasoning blocks to keep the context short.",
   "license": "MIT",
