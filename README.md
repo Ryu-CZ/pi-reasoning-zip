@@ -39,38 +39,31 @@ There are `thinking` blocks in your Pi session filling your context window. But 
   <img src="https://raw.githubusercontent.com/Ryu-CZ/pi-reasoning-zip/main/media/diagram-zip-flow.svg" alt="reasoning context of closed and open llm" />
 </p>
 
+
+### Compaction effectiveness
+
+From my [local benchmark](#local-benchmark)
+
+| Metric across 7 sessions | Normal | Zip ON | Change |
+|---|-------:|-------:|---:|
+| Stored thinking characters | 15,242 |  4,631 | -69.6% |
+| Complete session JSONL bytes | 57,902 | 49,317 | -14.8% |
+
+
 ## Install
 
+
+From npm:
 ```bash
-# From npm, after publish
 pi install npm:pi-reasoning-zip
-
-# From git
-pi install git:github.com/Ryu-CZ/pi-reasoning-zip
-
-# Development
-npm install
-npm run check
-npm run smoke
 ```
 
-For local development you can also load the readable source extension directly:
-
+From git
 ```bash
-pi -e ./extensions
+pi install git:github.com/Ryu-CZ/pi-reasoning-zip
 ```
 
-The npm library entrypoint still builds to `dist/index.js`, but Pi package metadata points at `./extensions` so Pi can inspect the source it loads.
 
-## Features
-
-- **Forward-only compaction** — modifies only the new assistant message being finalized.
-- **Stored compact traces** — future turns naturally replay compact `thinking` because that is what Pi stored.
-- **Local compactor** — calls a configured OpenAI-compatible `/chat/completions` endpoint directly.
-- **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
-- **Prompt minimization** — optional grug-style request injection for target local providers.
-- **Fail-open safety** — preserves original messages on errors, timeouts, invalid output, or unknown payloads.
-- **Opaque reasoning guard** — skips signed, encrypted, redacted, or provider-opaque reasoning metadata while allowing llama.cpp's plain `reasoning_content` traces.
 
 ## Commands
 
@@ -85,12 +78,17 @@ The npm library entrypoint still builds to `dist/index.js`, but Pi package metad
 
 Without an explicit scope, writes update the nearest existing `reasoningZip` settings section, falling back to global Pi settings. The extension rereads settings for each hook call, so enable/disable affects subsequent compaction and prompt-injection events. When enabled, Pi's footer shows `reasoningZip.footerStatus` from global settings, defaulting to `🗜️ Zip`.
 
-`pi-reasoning-zip` works through Pi lifecycle hooks:
 
-| Hook | Purpose |
-|---|---|
-| `message_end` | Compact eligible new assistant `thinking` blocks before storage |
-| `before_provider_request` | Optionally inject terse-reasoning guidance for target local providers |
+## Features
+
+- **Forward-only compaction** — modifies only the new assistant message being finalized.
+- **Stored compact traces** — future turns naturally replay compact `thinking` because that is what Pi stored.
+- **Local compactor** — calls a configured OpenAI-compatible `/chat/completions` endpoint directly.
+- **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
+- **Prompt minimization** — optional grug-style request injection for target local providers.
+- **Fail-open safety** — preserves original messages on errors, timeouts, invalid output, or unknown payloads.
+- **Opaque reasoning guard** — skips signed, encrypted, redacted, or provider-opaque reasoning metadata while allowing llama.cpp's plain `reasoning_content` traces.
+
 
 ## Configuration
 
@@ -107,7 +105,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     "footerStatus": "🗜️ Zip",
     "compactor": {
       "baseUrl": "http://127.0.0.1:7484/v1",
-      "model": "unsloth",
+      "model": "Qwen3.6-27B",
       "apiKey": "sk-placeholder",
       "maxTokens": 512,
       "temperature": 0.1,
@@ -122,6 +120,8 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
 ```
 
 `footerStatus` is read from global settings only; project settings can still control compaction behavior.
+
+
 
 ### Modes
 
@@ -193,31 +193,10 @@ It skips:
 - unknown providers by default in `llama-only`
 - hosted/non-local providers in `local-only`
 
-## Smoke tests
-
-Automated local smoke test:
-
-```bash
-npm run smoke
-```
-
-This loads `dist/index.js`, registers the Pi hooks against a mock extension API, uses a temporary `.pi/settings.json`, mocks the OpenAI-compatible compactor, and verifies thinking compaction plus targeted prompt injection.
-
-Manual Pi smoke test:
-
-1. Start a local llama.cpp/OpenAI-compatible server that can compact text.
-2. Configure `reasoningZip.compactor.baseUrl` and `reasoningZip.compactor.model`.
-3. Enable `mode: "llama-only"` and use a llama.cpp provider in Pi.
-4. Ask a prompt that produces long visible reasoning/thinking.
-5. Inspect the session JSONL.
-6. Confirm the new assistant message contains compact `thinking`, not raw verbose reasoning.
-7. Confirm older session entries were not changed.
-8. Send another prompt and confirm Pi replays the compact trace because that is what was stored.
-
 ## Local Benchmark
 
 On 2026-07-09, a paired local benchmark ran seven high-thinking Pi tasks against
-`unsloth` on llama.cpp. The same model served both the main Pi task and the
+`Qwen3.6-27B` on llama.cpp. The same model served both the main Pi task and the
 compactor. All other installed Pi extensions stayed enabled; tools were disabled
 for repeatability. The enabled arm loaded this extension from source, while the
 disabled arm changed only `reasoningZip.enabled`. Temporary Pi settings were
@@ -245,7 +224,47 @@ state between calls. Dynamic context supplied by other extensions can also vary
 between sessions, so provider input-token and response-time counters are not
 directly comparable across the two arms.
 
+## Smoke tests
+
+Automated local smoke test:
+
+```bash
+npm run smoke
+```
+
+This loads `dist/index.js`, registers the Pi hooks against a mock extension API, uses a temporary `.pi/settings.json`, mocks the OpenAI-compatible compactor, and verifies thinking compaction plus targeted prompt injection.
+
+Manual Pi smoke test:
+
+1. Start a local llama.cpp/OpenAI-compatible server that can compact text.
+2. Configure `reasoningZip.compactor.baseUrl` and `reasoningZip.compactor.model`.
+3. Enable `mode: "llama-only"` and use a llama.cpp provider in Pi.
+4. Ask a prompt that produces long visible reasoning/thinking.
+5. Inspect the session JSONL.
+6. Confirm the new assistant message contains compact `thinking`, not raw verbose reasoning.
+7. Confirm older session entries were not changed.
+8. Send another prompt and confirm Pi replays the compact trace because that is what was stored.
+
+
+
 ## Development
+
+
+### How it works
+
+`pi-reasoning-zip` works through Pi lifecycle hooks:
+
+| Hook | Purpose |
+|---|---|
+| `message_end` | Compact eligible new assistant `thinking` blocks before storage |
+| `before_provider_request` | Optionally inject terse-reasoning guidance for target local providers |
+
+
+### Self inspecting
+
+The npm library entrypoint still builds to `dist/index.js`, but Pi package metadata points at `./extensions` so Pi can inspect the source it loads.
+
+### Useful commands
 
 ```bash
 npm run typecheck
@@ -257,7 +276,13 @@ pi -e ./extensions --no-extensions --offline --list-models
 npm pack --dry-run
 ```
 
-## Release checklist
+For local development you can also load the readable source extension directly:
+
+```bash
+pi -e ./extensions
+```
+
+### Release checklist
 
 1. Update the version in `package.json` and `package-lock.json`.
 
