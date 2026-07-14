@@ -24,6 +24,7 @@ describe("compactWithOpenAI", () => {
     expect(body.messages[1].content).toContain("original thinking");
     expect(body.messages[1].content).toContain("Compression role: grug");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(body.thinking_budget_tokens).toBe(0);
   });
 
   it("passes configured compression role into the compaction prompt", async () => {
@@ -44,7 +45,7 @@ describe("compactWithOpenAI", () => {
     await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("Compactor HTTP 500");
   });
 
-  it("retries without llama-specific thinking flag when endpoint rejects it", async () => {
+  it("retries without llama-specific thinking controls when endpoint rejects them", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce({ ok: false, status: 400 } as Response)
@@ -58,12 +59,84 @@ describe("compactWithOpenAI", () => {
     const firstBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     const secondBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
     expect(firstBody.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(firstBody.thinking_budget_tokens).toBe(0);
     expect(secondBody.chat_template_kwargs).toBeUndefined();
+    expect(secondBody.thinking_budget_tokens).toBeUndefined();
   });
 
   it("throws on missing content", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json: async () => ({ choices: [{}] }) } as Response);
     await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("missing message content");
+  });
+
+  it("rejects split reasoning-only responses", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { reasoning_content: "new private reasoning" } }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("missing message content");
+  });
+
+  it("uses final content and ignores split reasoning", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { reasoning_content: "new private reasoning", reasoning: "also private", content: "compact trace" } }],
+      }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).resolves.toBe("compact trace");
+  });
+
+  it("rejects inline think wrappers", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "<think>new private reasoning</think>compact trace" } }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("inline reasoning");
+  });
+
+  it("rejects legacy-like inline reasoning even when a split field is present", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { reasoning_content: "new private reasoning", content: "<reasoning>new private reasoning</reasoning>compact trace" } }],
+      }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("inline reasoning");
+  });
+
+  it("rejects inline analysis markers", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    for (const content of ["<analysis>new private reasoning</analysis>compact trace", "<|channel|>analysis new private reasoning"]) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content } }] }),
+      } as Response);
+
+      await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("inline reasoning");
+    }
+  });
+
+  it("rejects empty final content", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "   " } }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("empty message content");
+  });
+
+  it("rejects output truncated by the token limit", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ finish_reason: "length", message: { content: "partial compact trace" } }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("response was truncated");
   });
 
   it("passes an abort signal for timeout handling", async () => {

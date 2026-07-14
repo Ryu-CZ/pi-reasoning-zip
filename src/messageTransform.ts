@@ -32,32 +32,36 @@ export async function compactAssistantMessage(
   message: PiMessage,
   settings: ReasoningZipSettings,
   compactText: CompactText,
-): Promise<{ message: PiMessage; changed: boolean }> {
-  if (!shouldHandleMessage(message, settings)) return { message, changed: false };
-  if (!Array.isArray(message.content)) return { message, changed: false };
+): Promise<{ message: PiMessage; changed: boolean; failures: number }> {
+  if (!shouldHandleMessage(message, settings)) return { message, changed: false, failures: 0 };
+  if (!Array.isArray(message.content)) return { message, changed: false, failures: 0 };
+  // Tool-call continuations may depend on the exact preceding reasoning. Until
+  // that flow is verified end-to-end, preserve the complete assistant message.
+  if (message.content.some((block) => block.type === "toolCall")) return { message, changed: false, failures: 0 };
 
-  let changed = false;
-  const nextContent: PiMessageBlock[] = [];
-
-  for (const block of message.content) {
-    if (!isThinkingBlock(block) || hasOpaqueReasoningMetadata(block) || block.thinking.length < settings.thresholds.minChars) {
-      nextContent.push(block);
-      continue;
+  const results = await Promise.all(message.content.map(async (block): Promise<{ block: PiMessageBlock; changed: boolean; failures: number }> => {
+    if (
+      !isThinkingBlock(block)
+      || hasOpaqueReasoningMetadata(block)
+      || block.thinking.length < settings.thresholds.minChars
+      || block.thinking.length > settings.thresholds.maxInputChars
+    ) {
+      return { block, changed: false, failures: 0 };
     }
 
     try {
       const compacted = acceptableCompaction(block.thinking, await compactText(block.thinking), settings);
       if (!compacted) {
-        nextContent.push(block);
-        continue;
+        return { block, changed: false, failures: 0 };
       }
-      nextContent.push({ ...block, thinking: compacted });
-      changed = true;
+      return { block: { ...block, thinking: compacted }, changed: true, failures: 0 };
     } catch {
-      nextContent.push(block);
+      return { block, changed: false, failures: 1 };
     }
-  }
+  }));
 
-  if (!changed) return { message, changed: false };
-  return { message: { ...message, content: nextContent }, changed: true };
+  const changed = results.some((result) => result.changed);
+  const failures = results.reduce((count, result) => count + result.failures, 0);
+  if (!changed) return { message, changed: false, failures };
+  return { message: { ...message, content: results.map((result) => result.block) }, changed: true, failures };
 }

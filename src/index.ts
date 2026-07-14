@@ -73,8 +73,28 @@ function readSettingsSection(path: string | undefined): unknown {
   }
 }
 
+function isSettingsObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function mergeSettingsObjects(globalValue: Record<string, unknown>, projectValue: Record<string, unknown>): Record<string, unknown> {
+  const merged = { ...globalValue };
+  for (const [key, value] of Object.entries(projectValue)) {
+    const inherited = merged[key];
+    merged[key] = isSettingsObject(inherited) && isSettingsObject(value)
+      ? mergeSettingsObjects(inherited, value)
+      : value;
+  }
+  return merged;
+}
+
 function readRawSettings(cwd: string | undefined): unknown {
-  return readSettingsSection(projectSettingsPath(cwd)) ?? readSettingsSection(globalSettingsPath());
+  const globalSettings = readSettingsSection(globalSettingsPath());
+  const projectSettings = readSettingsSection(projectSettingsPath(cwd));
+  if (!isSettingsObject(projectSettings)) return globalSettings;
+  const runtimeProjectSettings = { ...projectSettings };
+  delete runtimeProjectSettings.footerStatus;
+  return mergeSettingsObjects(isSettingsObject(globalSettings) ? globalSettings : {}, runtimeProjectSettings);
 }
 
 function readGlobalSettings(): unknown {
@@ -98,6 +118,12 @@ function cwdFromContext(ctx: unknown): string {
 
 function notify(ctx: unknown, message: string, level = "info"): void {
   if (ctx && typeof ctx === "object") (ctx as PiCommandContext).ui?.notify?.(message, level);
+}
+
+function notifyCompactionFailures(ctx: unknown, failures: number): void {
+  if (failures > 0) {
+    notify(ctx, "pi-reasoning-zip compaction failed; original reasoning was preserved.", "warning");
+  }
 }
 
 function setFooterStatus(ctx: unknown, enabled: boolean): void {
@@ -178,6 +204,7 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
     setFooterStatus(ctx, settings.enabled);
     const result = await compactAssistantMessage(event.message, settings, (thinking) => compactWithOpenAI(thinking, settings));
+    notifyCompactionFailures(ctx, result.failures);
     if (result.changed) return { message: result.message };
     return undefined;
   });

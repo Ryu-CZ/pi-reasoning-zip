@@ -5,7 +5,7 @@ import type { ReasoningZipCompressionRole, ReasoningZipMode, ReasoningZipSetting
 
 export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   enabled: true,
-  mode: "llama-only",
+  mode: "local-only",
   storageMode: "compact-new",
   compressionRole: "grug",
   injectPrompt: true,
@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   },
   thresholds: {
     minChars: 1000,
+    maxInputChars: 50000,
     maxTraceChars: 2000,
   },
 };
@@ -143,6 +144,7 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
     },
     thresholds: {
       minChars: numberValue(thresholds.minChars, DEFAULT_SETTINGS.thresholds.minChars, 0),
+      maxInputChars: numberValue(thresholds.maxInputChars, DEFAULT_SETTINGS.thresholds.maxInputChars, 1),
       maxTraceChars: numberValue(thresholds.maxTraceChars, DEFAULT_SETTINGS.thresholds.maxTraceChars, 1),
     },
   };

@@ -10,7 +10,12 @@ function buildPayload(thinking: string, settings: ReasoningZipSettings, disableT
     ],
     max_tokens: settings.compactor.maxTokens,
     temperature: settings.compactor.temperature,
-    ...(disableThinking ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+    ...(disableThinking
+      ? {
+          chat_template_kwargs: { enable_thinking: false },
+          thinking_budget_tokens: 0,
+        }
+      : {}),
   };
 }
 
@@ -37,17 +42,34 @@ export async function compactWithOpenAI(thinking: string, settings: ReasoningZip
   try {
     let response = await postCompactionRequest(thinking, settings, controller.signal, true);
 
-    // Some strict OpenAI-compatible endpoints reject llama.cpp/Qwen-specific
-    // chat_template_kwargs. Retry once without it for compatibility.
+    // Some strict OpenAI-compatible endpoints reject llama.cpp-specific
+    // thinking controls. Retry once without them for compatibility.
     if (response.status === 400 || response.status === 422) {
       response = await postCompactionRequest(thinking, settings, controller.signal, false);
     }
 
     if (!response.ok) throw new Error(`Compactor HTTP ${response.status}`);
-    const json = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
-    const content = json.choices?.[0]?.message?.content;
+    const json = (await response.json()) as {
+      choices?: Array<{
+        finish_reason?: unknown;
+        message?: { content?: unknown; reasoning?: unknown; reasoning_content?: unknown };
+      }>;
+    };
+    const choice = json?.choices?.[0];
+    if (choice?.finish_reason === "length" || choice?.finish_reason === "max_tokens") {
+      throw new Error("Compactor response was truncated");
+    }
+    const content = choice?.message?.content;
     if (typeof content !== "string") throw new Error("Compactor response missing message content");
-    return content.trim();
+    const compacted = content.trim();
+    if (!compacted) throw new Error("Compactor response has empty message content");
+    if (
+      /<\s*\/?\s*(?:think|thinking|reasoning|analysis)\b[^>]*>/i.test(compacted)
+      || /<\|channel\|>\s*analysis/i.test(compacted)
+    ) {
+      throw new Error("Compactor response contains inline reasoning");
+    }
+    return compacted;
   } finally {
     clearTimeout(timeout);
   }

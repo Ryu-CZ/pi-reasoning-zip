@@ -10,10 +10,20 @@ export function isLocalUrl(value: string | undefined): boolean {
   if (!value) return false;
   try {
     const url = new URL(value.includes("://") ? value : `http://${value}`);
-    return ["127.0.0.1", "localhost", "::1", "0.0.0.0"].includes(url.hostname);
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    return ["127.0.0.1", "localhost", "::1", "0.0.0.0"].includes(hostname);
   } catch {
     return false;
   }
+}
+
+function isLocalProvider(providerId: string | undefined): boolean {
+  if (!providerId) return false;
+  const llamaServerPrefix = "llama-server=";
+  if (providerId.toLowerCase().startsWith(llamaServerPrefix)) {
+    return isLocalUrl(providerId.slice(llamaServerPrefix.length));
+  }
+  return isLocalUrl(providerId);
 }
 
 export function shouldHandleMessage(message: PiMessage, settings: ReasoningZipSettings): boolean {
@@ -23,7 +33,7 @@ export function shouldHandleMessage(message: PiMessage, settings: ReasoningZipSe
   const provider = typeof message.provider === "string" ? message.provider : undefined;
   if (settings.mode === "all") return true;
   if (settings.mode === "llama-only") return isLlamaProvider(provider);
-  if (settings.mode === "local-only") return isLocalUrl(provider) || isLlamaProvider(provider);
+  if (settings.mode === "local-only") return isLocalProvider(provider);
   return false;
 }
 
@@ -31,6 +41,6 @@ export function shouldTargetProvider(provider: string | undefined, settings: Rea
   if (!settings.enabled || settings.mode === "disabled") return false;
   if (settings.mode === "all") return true;
   if (settings.mode === "llama-only") return isLlamaProvider(provider);
-  if (settings.mode === "local-only") return isLocalUrl(provider) || isLlamaProvider(provider);
+  if (settings.mode === "local-only") return isLocalProvider(provider);
   return false;
 }

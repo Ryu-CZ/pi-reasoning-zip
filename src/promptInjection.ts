@@ -8,6 +8,13 @@ type ChatMessage = { role?: unknown; content?: unknown; [key: string]: unknown }
 
 type Payload = { messages?: unknown; [key: string]: unknown };
 
+function contentHasMarker(content: unknown): boolean {
+  if (typeof content === "string") return content.includes(PROMPT_MARKER);
+  return Array.isArray(content) && content.some(
+    (part) => typeof part === "object" && part && "text" in part && typeof part.text === "string" && part.text.includes(PROMPT_MARKER),
+  );
+}
+
 function appendToContent(content: unknown): unknown {
   if (typeof content === "string") {
     if (content.includes(PROMPT_MARKER)) return content;
@@ -29,7 +36,9 @@ export function injectReasoningZipPrompt(payload: unknown, provider: string | un
   if (!Array.isArray(typed.messages)) return payload;
 
   const messages = typed.messages as ChatMessage[];
-  const existing = JSON.stringify(messages).includes(PROMPT_MARKER);
+  const existing = messages.some(
+    (message) => (message.role === "system" || message.role === "developer") && contentHasMarker(message.content),
+  );
   if (existing) return payload;
 
   const index = messages.findIndex((message) => message.role === "system" || message.role === "developer");

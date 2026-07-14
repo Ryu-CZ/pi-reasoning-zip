@@ -50,7 +50,7 @@
     "smoke": "npm run build && node scripts/smoke-extension.mjs"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "^0.80.3"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",

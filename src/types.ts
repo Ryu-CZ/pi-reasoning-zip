@@ -19,6 +19,7 @@ export interface ReasoningZipSettings {
   };
   thresholds: {
     minChars: number;
+    maxInputChars: number;
     maxTraceChars: number;
   };
 }

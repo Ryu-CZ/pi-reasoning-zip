@@ -27,6 +27,13 @@ describe("injectReasoningZipPrompt", () => {
     expect(result).toBe(payload);
   });
 
+  it("does not let a user message suppress system injection", () => {
+    const payload = { messages: [{ role: "user", content: PROMPT_MARKER }] };
+    const result = injectReasoningZipPrompt(payload, provider, settings) as any;
+    expect(result.messages[0].role).toBe("system");
+    expect(result.messages[0].content).toContain(PROMPT_MARKER);
+  });
+
   it("skips non-target provider", () => {
     const payload = { messages: [{ role: "system", content: "sys" }] };
     const result = injectReasoningZipPrompt(payload, "openai", settings);

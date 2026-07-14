@@ -42,6 +42,12 @@ async function tempProject(settings: unknown): Promise<string> {
   return dir;
 }
 
+async function writeGlobalSettings(cwd: string, settings: unknown): Promise<void> {
+  process.env.PI_CODING_AGENT_DIR = join(cwd, "agent");
+  await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true });
+  await writeFile(join(process.env.PI_CODING_AGENT_DIR, "settings.json"), JSON.stringify({ reasoningZip: settings }), "utf8");
+}
+
 describe("extension entrypoint", () => {
   it("registers hooks, footer lifecycle, and reasoning-zip command", () => {
     const { handlers, commands } = loadExtensionSurface();
@@ -80,7 +86,7 @@ describe("extension entrypoint", () => {
   });
 
   it("footer status follows resolved enabled setting and global label on session lifecycle", async () => {
-    const enabledCwd = await tempProject({ enabled: true });
+    const enabledCwd = await tempProject({ enabled: true, footerStatus: "Project Zip" });
     const disabledCwd = await tempProject({ enabled: false });
     process.env.PI_CODING_AGENT_DIR = join(enabledCwd, "agent");
     await mkdir(process.env.PI_CODING_AGENT_DIR, { recursive: true });
@@ -113,6 +119,78 @@ describe("extension entrypoint", () => {
     expect(result.message.content[0].thinking).toBe("zip");
   });
 
+  it("message_end warns when compaction fails and preserves the original message", async () => {
+    const cwd = await tempProject({ mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 500 } as Response);
+    const handler = loadExtension().get("message_end")!;
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
+
+    const result = await handler(
+      { message },
+      { cwd, ui: { notify: (notification: string, level?: string) => notifications.push({ message: notification, level }) } },
+    );
+
+    expect(result).toBeUndefined();
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip compaction failed; original reasoning was preserved.", level: "warning" },
+    ]);
+  });
+
+  it("message_end recursively inherits global compactor and threshold settings", async () => {
+    const cwd = await tempProject({ mode: "all", thresholds: { minChars: 5 } });
+    await writeGlobalSettings(cwd, {
+      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxTokens: 77 },
+      thresholds: { minChars: 1000, maxTraceChars: 2 },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+    const handler = loadExtension().get("message_end")!;
+
+    const result = await handler(
+      { message: { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("http://global.test/v1/chat/completions", expect.anything());
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { model: string; max_tokens: number };
+    expect(body.model).toBe("global-model");
+    expect(body.max_tokens).toBe(77);
+  });
+
+  it("message_end applies nested project overrides while inheriting sibling global settings", async () => {
+    const cwd = await tempProject({
+      mode: "all",
+      compactor: { model: "project-model" },
+      thresholds: { maxTraceChars: 12 },
+    });
+    await writeGlobalSettings(cwd, {
+      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxTokens: 77 },
+      thresholds: { minChars: 5, maxTraceChars: 5 },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "project zip" } }] }),
+    } as Response);
+    const handler = loadExtension().get("message_end")!;
+
+    const result = await handler(
+      { message: { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+
+    expect(result.message.content[0].thinking).toBe("project zip");
+    const [url, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(String((init as RequestInit).body)) as { model: string; max_tokens: number };
+    expect(url).toBe("http://global.test/v1/chat/completions");
+    expect(body.model).toBe("project-model");
+    expect(body.max_tokens).toBe(77);
+  });
+
   it("message_end returns undefined when unchanged", async () => {
     const cwd = await tempProject({ mode: "all", thresholds: { minChars: 1000 } });
     const handler = loadExtension().get("message_end")!;
@@ -137,6 +215,19 @@ describe("extension entrypoint", () => {
       { type: "before_provider_request", payload: { messages: [{ role: "system", content: "sys" }] } },
       { cwd, model: { provider: "llama-server=http://127.0.0.1:7484" } },
     );
+    expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+  });
+
+  it("ignores a malformed project section and keeps valid global settings", async () => {
+    const cwd = await tempProject("invalid");
+    await writeGlobalSettings(cwd, { mode: "all" });
+    const handler = loadExtension().get("before_provider_request")!;
+
+    const injected = handler(
+      { provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+
     expect(injected.messages[0].content).toContain(PROMPT_MARKER);
   });
 });

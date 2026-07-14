@@ -98,7 +98,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
 {
   "reasoningZip": {
     "enabled": true,
-    "mode": "llama-only",
+    "mode": "local-only",
     "storageMode": "compact-new",
     "compressionRole": "grug",
     "injectPrompt": true,
@@ -113,6 +113,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     },
     "thresholds": {
       "minChars": 1000,
+      "maxInputChars": 50000,
       "maxTraceChars": 2000
     }
   }
@@ -128,7 +129,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
 | Mode | Behavior |
 |---|---|
 | `llama-only` | Compact llama.cpp-like providers only |
-| `local-only` | Compact local URL providers and llama.cpp-like providers |
+| `local-only` | Compact local URL providers and local `llama-server=` endpoints only |
 | `all` | Compact any eligible plain Pi `thinking` block |
 | `disabled` | No-op |
 
@@ -155,7 +156,7 @@ The compactor must expose an OpenAI-compatible chat completions endpoint:
 POST {baseUrl}/chat/completions
 ```
 
-The extension first sends `chat_template_kwargs: { "enable_thinking": false }` so llama.cpp/Qwen-style compactor calls return the compact trace in `message.content` instead of spending tokens on compactor-side reasoning. If a stricter OpenAI-compatible endpoint rejects that extra field with HTTP 400/422, the request is retried once without it.
+The extension first sends `chat_template_kwargs: { "enable_thinking": false }` and `thinking_budget_tokens: 0` so llama.cpp/Qwen-style compactor calls return the compact trace in `message.content` instead of spending tokens on compactor-side reasoning. If a stricter OpenAI-compatible endpoint rejects those fields with HTTP 400/422, the request is retried once without them.
 
 The extension asks the compactor to produce terse output like:
 
@@ -172,7 +173,7 @@ next:
 - ...
 ```
 
-The configured `compressionRole` guides the compactor's terse style. If the compactor returns `none`, empty output, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
+The configured `compressionRole` guides the compactor's terse style. If the compactor returns `none`, empty output, inline reasoning wrappers, truncated output, output longer than the original, or output over `thresholds.maxTraceChars`, the original block is preserved.
 
 ## Safety model
 
@@ -189,9 +190,13 @@ It skips:
 - non-assistant messages
 - messages without array content
 - short thinking below `thresholds.minChars`
+- thinking above `thresholds.maxInputChars`
+- assistant messages that include tool calls
 - cryptographically signed, encrypted, or redacted thinking blocks
 - unknown providers by default in `llama-only`
 - hosted/non-local providers in `local-only`
+
+If a compactor request fails, the extension preserves the original reasoning and sends a Pi warning notification.
 
 ## Local Benchmark
 

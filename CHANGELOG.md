@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added CI for typecheck, tests, build, smoke test, and package dry-run.
+- Added `thresholds.maxInputChars` to skip oversized compactor inputs.
+- Added Pi warning notifications when compaction fails and the original reasoning is preserved.
+
+### Changed
+
+- Default targeting mode is now `local-only`.
+- Runtime project settings now recursively merge into global `reasoningZip` settings instead of replacing nested objects wholesale.
+- Independent thinking blocks in a message are compacted concurrently while preserving block order.
+- Tightened the Pi peer dependency from `*` to `^0.80.3`.
+
+### Fixed
+
+- `local-only` now rejects remote `llama-server=` endpoints and llama-like non-local provider ids.
+- Compactor requests disable compactor-side thinking with both `chat_template_kwargs.enable_thinking=false` and `thinking_budget_tokens=0`.
+- Compactor responses now reject missing content, empty content, inline reasoning wrappers, and truncated completions.
+- Prompt-injection marker suppression now ignores spoofed markers in user messages.
+- Assistant messages containing tool calls are preserved until tool-call continuation behavior is verified.
+
 ## [0.3.0] - 2026-07-10
 
 ### Added
