@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-31
+
 ### Added
 
 - Added optional llama.cpp slot pinning to keep reasoning-zip compaction from invalidating the main chat prompt/KV cache on shared local servers:
@@ -142,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.9...v0.3.0
 [0.2.9]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.8...v0.2.9
