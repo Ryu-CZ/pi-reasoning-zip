@@ -282,34 +282,103 @@ If a compactor request fails, the extension preserves the original reasoning and
 
 ## Local Benchmark
 
-On 2026-07-09, a paired local benchmark ran seven high-thinking Pi tasks against
-`Qwen3.6-27B` on llama.cpp. The same model served both the main Pi task and the
-compactor. All other installed Pi extensions stayed enabled; tools were disabled
-for repeatability. The enabled arm loaded this extension from source, while the
-disabled arm changed only `reasoningZip.enabled`. Temporary Pi settings were
-restored after the run.
+On 2026-08-01, five reasoning-heavy tasks were run with Pi `0.83.0` and this
+extension at `0.5.0` against a local 27B Qwen3.6-derived Q4 model served by
+llama.cpp. The server exposed an 83,968-token context with two unified-KV slots.
+The same model (`unsloth`) handled both the main response and compaction.
 
-The benchmark used `compressionRole: "grug"`, `injectPrompt: false`,
-`minChars: 200`, `maxTraceChars: 2000`, and `compactor.maxTokens: 512` so it
-measured stored-trace compression rather than prompt injection.
+The test isolated the two arms completely:
 
-| Metric across 7 sessions | Disabled | Enabled | Change |
+- **Baseline:** core Pi with no extensions.
+- **Treatment:** core Pi plus only `pi-reasoning-zip` loaded from this checkout.
+- Both arms disabled tools, skills, prompt templates, and context files.
+- Both used fresh one-turn sessions, the same prompts, model, and thinking level.
+- `injectPrompt: false` kept the extension from changing the main model prompt.
+
+The tested storage settings were:
+
+```json
+{
+  "compressionRole": "grug",
+  "injectPrompt": false,
+  "compactor": { "maxTokens": 512, "temperature": 0.1 },
+  "thresholds": {
+    "minChars": 400,
+    "maxInputChars": 20000,
+    "maxTraceChars": 2000
+  }
+}
+```
+
+Because local sampling produced different reasoning lengths between independent
+live requests, raw enabled/disabled totals would mix generation variance with
+compression. For the controlled storage and quality comparison, each exact
+baseline trace was therefore sent to the same configured compactor:
+
+| Task | Original thinking | Compact thinking | Change | Retention result |
+|---|---:|---:|---:|---|
+| Incident rollback plan | 1,261 chars | 378 chars | -70.0% | All supplied facts, thresholds, path, command, and migration constraint retained |
+| Double-charge debugging | 3,934 chars | 830 chars | -78.9% | Claim/retry design and failed approaches retained; some API-idempotency nuance condensed |
+| Sliding-window algorithm | 2,079 chars | 560 chars | -73.1% | Algorithm, inclusive boundary, correctness argument, and complexity retained |
+| Redis-to-PostgreSQL migration | 467 chars | 349 chars | -25.3% | All explicit migration constraints retained |
+| Inference-service decision | 599 chars | 474 chars | -20.9% | Hard constraints and option data retained; workload and TTFT details were omitted |
+| **Total** | **8,340 chars** | **2,591 chars** | **-68.9%** | Core continuation state retained, with greater detail loss in the shortest trace |
+
+The 400-character threshold successfully compacted all five traces, including
+live Pi storage checks for the two short task classes. Its tradeoff is visible:
+the two shortest traces required two extra model requests to save only 243
+characters, and one lost secondary context. A higher threshold reduces those
+requests; 400 favors aggressive coverage.
+
+### Slot-isolation verification
+
+A live auto-mode run sampled llama.cpp's `/slots` endpoint every 100 ms and
+correlated 413 samples with `llama-think.service` logs:
+
+| Request | Slot | llama.cpp task | Duration | Observed request shape |
+|---|---:|---:|---:|---|
+| Main Pi generation | 0 | 1124 | 17.53 s | Streaming, temperature 0.59375, 4,400-token limit |
+| Reasoning compactor | 1 | 1901 | 1.77 s | Non-streaming, temperature 0.1, 512-token limit |
+
+The logs showed explicit selection by ID: the main request used slot 0, released
+it, and the compactor then used slot 1. There was no slot collision, and the
+resulting session stored a valid compact trace. On this run the main model
+generated about 77.7 tokens/s and the compactor about 102.5 tokens/s. These are
+host-specific observations, not general performance claims.
+
+A separate multi-turn run tested whether compaction preserved the main prompt
+cache across a following Pi turn:
+
+| Stage | Slot | Prompt tokens newly evaluated | Approximate cached prefix reused |
 |---|---:|---:|---:|
-| Stored thinking characters | 15,242 | 4,631 | -69.6% |
-| Complete session JSONL bytes | 57,902 | 49,317 | -14.8% |
+| Initial main turn | 0 | 504 | N/A |
+| Compactor | 1 | 275 | Separate slot; slot 0 untouched |
+| First main turn after compaction | 0 | 950 | 524 tokens (about 35.5% of its prompt) |
+| Repeated follow-up | 0 | 54 | 1,578 tokens (about 96.7% of its prompt) |
 
-Quality was checked by feeding each of the seven original traces to the same
-local compactor and comparing the result with its source. Six traces compacted
-from 14,593 to 4,642 characters while retaining the task facts, decisions,
-constraints, operational risks, and explicit rollback actions where present.
-The remaining short trace returned `none`; the extension's fail-open rule kept
-the original trace instead of storing an empty summary.
+The compactor did not overwrite slot 0. The first following turn could reuse the
+unchanged conversation prefix, but it still had to evaluate the suffix where the
+stored compact reasoning differed from the originally generated reasoning. Once
+slot 0 contained that compact replay form, the next turn reused nearly the whole
+prompt. Slot isolation therefore prevents **wholesale** cache invalidation; it
+cannot prevent the intentional reasoning rewrite from changing part of the
+prompt.
 
-This is a storage benchmark, not a latency benchmark. The compactor makes an
-additional request, and a single-slot llama.cpp server changes its KV-cache
-state between calls. Dynamic context supplied by other extensions can also vary
-between sessions, so provider input-token and response-time counters are not
-directly comparable across the two arms.
+This distinction becomes important for long sessions. At the observed local
+prompt-processing range of roughly 1,000-2,000 tokens/s, rebuilding a completely
+lost 60k-token prompt would take approximately 30-60 seconds. Preserving its
+prefix and evaluating only a 1k-3k-token changed suffix would take roughly 1-3
+seconds, before normal output generation. These figures are an extrapolation,
+not a measured 60k-token benchmark, and actual throughput may fall with long
+contexts. The server's 83,968-token unified KV pool is also shared: a 60k-token
+main cache plus a modest compactor request has useful headroom, while operation
+near the context limit may still force eviction.
+
+The compression table remains primarily a **storage and retention benchmark**.
+Compaction adds another model request; cache-retention savings occur on later
+turns and depend on session length, prefix similarity, and available unified KV.
+The repository's isolated automated suite passed 89/89 tests after the live
+checks.
 
 ## Smoke tests
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the README's 2026-07-09 local benchmark with an isolated five-task Pi `0.83.0` benchmark using `thresholds.minChars: 400`; documented exact-trace compression and retention results, short-trace tradeoffs, live llama.cpp slot isolation, multi-turn KV-cache retention, host-specific generation speeds, and estimated long-session prompt-processing savings.
+
 ## [0.5.0] - 2026-07-31
 
 ### Added
