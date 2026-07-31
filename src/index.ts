@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { compactWithOpenAI } from "./compactorClient.js";
-import { compactAssistantMessage } from "./messageTransform.js";
+import { compactAssistantMessage, hasCompactionCandidate } from "./messageTransform.js";
 import { injectLlamaCppMainSlot, injectReasoningZipPrompt } from "./promptInjection.js";
 import { inspectEnabledSetting, resolveReasoningZipSettings, type SettingsScope, writeEnabledSetting } from "./settings.js";
 import { isLlamaProvider } from "./target.js";
-import type { PiMessage, ReasoningZipSettings } from "./types.js";
+import type { AutoSlotDecision, PiMessage, ReasoningZipSettings } from "./types.js";
 
 // Minimal structural types for the Pi hooks and command surface we consume.
 // Avoids `pi as any` while staying independent of upstream type changes.
@@ -165,47 +165,86 @@ function withSlotPinning(settings: ReasoningZipSettings, enabled: boolean): Reas
   return { ...settings, llamaCppSlots: { ...settings.llamaCppSlots, enabled } };
 }
 
-const SLOT_PROBE_TTL_MS = 30000;
-const slotProbeCache = new Map<string, { expiresAt: number; result: boolean; pending?: Promise<boolean> }>();
+const pendingSlotProbes = new Map<string, Promise<number | undefined>>();
 
-async function hasAtLeastTwoLlamaCppSlots(baseUrl: string): Promise<boolean> {
+async function probeLlamaCppSlotCount(baseUrl: string, apiKey: string): Promise<number | undefined> {
   const url = slotsUrl(baseUrl);
-  if (!url) return false;
-  const now = Date.now();
-  const cached = slotProbeCache.get(url);
-  if (cached && cached.expiresAt > now) return cached.pending ?? cached.result;
+  if (!url) return undefined;
+  const probeKey = `${url}\n${apiKey}`;
+  const existing = pendingSlotProbes.get(probeKey);
+  if (existing) return existing;
 
   const pending = (async () => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 500);
     try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) return false;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      if (!response.ok) return undefined;
       const json = await response.json() as unknown;
-      return Array.isArray(json) && json.length >= 2;
+      return Array.isArray(json) ? json.length : undefined;
     } catch {
-      return false;
+      return undefined;
     } finally {
       clearTimeout(timeout);
     }
   })();
 
-  slotProbeCache.set(url, { expiresAt: now + SLOT_PROBE_TTL_MS, result: false, pending });
-  const result = await pending;
-  slotProbeCache.set(url, { expiresAt: Date.now() + SLOT_PROBE_TTL_MS, result });
-  return result;
+  pendingSlotProbes.set(probeKey, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingSlotProbes.delete(probeKey);
+  }
 }
 
-async function shouldPinSlots(provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): Promise<boolean> {
+function normalizeIdSlot(id: number, slotCount: number): number {
+  return ((id % slotCount) + slotCount) % slotCount;
+}
+
+function idsCollide(mainId: number, compactorId: number, slotCount: number): boolean {
+  return normalizeIdSlot(mainId, slotCount) === normalizeIdSlot(compactorId, slotCount);
+}
+
+async function shouldPinSlots(provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): Promise<AutoSlotDecision> {
   // Auto mode is conservative: only pin when the shared local llama.cpp server
   // reports at least two parallel slots. With one slot, id_slot wraps to the
   // only slot and cannot prevent prompt/KV cache invalidation.
-  if (!isSlotCapableProvider(provider, ctx, settings)) return false;
-  if (settings.llamaCppSlots.enabled === true) return true;
-  if (settings.llamaCppSlots.enabled !== "auto") return false;
+  if (!settings.enabled || settings.mode === "disabled" || settings.storageMode !== "compact-new") {
+    return { pinning: false, skipCompactor: false };
+  }
+  if (!isSlotCapableProvider(provider, ctx, settings)) {
+    return { pinning: false, skipCompactor: false };
+  }
+  if (settings.llamaCppSlots.enabled === true) {
+    return { pinning: true, skipCompactor: false };
+  }
+  if (settings.llamaCppSlots.enabled !== "auto") {
+    return { pinning: false, skipCompactor: false };
+  }
   const mainBaseUrl = providerBaseUrl(provider, ctx);
-  if (!sameServerEndpoint(mainBaseUrl, settings.compactor.baseUrl)) return false;
-  return await hasAtLeastTwoLlamaCppSlots(settings.compactor.baseUrl);
+  const normalizedMainBaseUrl = normalizedServerBase(mainBaseUrl);
+  const normalizedCompactorBaseUrl = normalizedServerBase(settings.compactor.baseUrl);
+  if (normalizedMainBaseUrl === undefined || normalizedCompactorBaseUrl === undefined) {
+    return { pinning: false, skipCompactor: true };
+  }
+  if (normalizedMainBaseUrl !== normalizedCompactorBaseUrl) {
+    // Different servers — safe to compact normally without pinning.
+    return { pinning: false, skipCompactor: false };
+  }
+  // Shared server: probe for slot count.
+  const slotCount = await probeLlamaCppSlotCount(settings.compactor.baseUrl, settings.compactor.apiKey);
+  // Probe failed or count < 2 → fail closed: no compactor, no pinning.
+  if (slotCount === undefined || slotCount < 2) {
+    return { pinning: false, slotCount, skipCompactor: true };
+  }
+  // Check normalized IDs don't collide.
+  if (idsCollide(settings.llamaCppSlots.mainIdSlot, settings.llamaCppSlots.compactorIdSlot, slotCount)) {
+    return { pinning: false, slotCount, skipCompactor: true };
+  }
+  return { pinning: true, slotCount, skipCompactor: false };
 }
 
 function cwdFromContext(ctx: unknown): string {
@@ -284,9 +323,34 @@ function conflictKey(cwd: string | undefined, provider: string | undefined): str
   return `${cwd ?? ""}\n${provider ?? ""}`;
 }
 
+interface InFlightSlotState {
+  decision: AutoSlotDecision;
+  conflict: boolean;
+  overlapping: boolean;
+  extensionEnabled: boolean;
+  mode: ReasoningZipSettings["mode"];
+  storageMode: ReasoningZipSettings["storageMode"];
+  slotMode: ReasoningZipSettings["llamaCppSlots"]["enabled"];
+  mainIdSlot: number;
+  compactorIdSlot: number;
+  mainBaseUrl?: string;
+  compactorBaseUrl: string;
+}
+
+function slotSettingsMatch(state: InFlightSlotState, provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): boolean {
+  return state.extensionEnabled === settings.enabled
+    && state.mode === settings.mode
+    && state.storageMode === settings.storageMode
+    && state.slotMode === settings.llamaCppSlots.enabled
+    && state.mainIdSlot === settings.llamaCppSlots.mainIdSlot
+    && state.compactorIdSlot === settings.llamaCppSlots.compactorIdSlot
+    && normalizedServerBase(state.mainBaseUrl) === normalizedServerBase(providerBaseUrl(provider, ctx))
+    && normalizedServerBase(state.compactorBaseUrl) === normalizedServerBase(settings.compactor.baseUrl);
+}
+
 export default function reasoningZipExtension(pi: ExtensionAPI) {
   const extension = pi as unknown as ReasoningZipExtension;
-  const disabledSlotConflictKeys = new Set<string>();
+  const inFlightSlotStates = new Map<string, InFlightSlotState>();
 
   extension.registerCommand?.("reasoning-zip", {
     description: "Enable, disable, or inspect pi-reasoning-zip",
@@ -306,11 +370,43 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
     setFooterStatus(ctx, settings.enabled);
     const provider = messageProvider(event.message, ctx);
     const key = conflictKey(ctx?.cwd, provider);
-    if (disabledSlotConflictKeys.has(key)) {
+    const state = inFlightSlotStates.get(key);
+    inFlightSlotStates.delete(key);
+
+    if (!hasCompactionCandidate(event.message, settings)) return undefined;
+
+    if (!state) {
+      const mainBaseUrl = normalizedServerBase(providerBaseUrl(provider, ctx));
+      const compactorBaseUrl = normalizedServerBase(settings.compactor.baseUrl);
+      const isolationUnknownOrShared = mainBaseUrl === undefined
+        || compactorBaseUrl === undefined
+        || mainBaseUrl === compactorBaseUrl;
+      if (settings.llamaCppSlots.enabled !== false
+        && isSlotCapableProvider(provider, ctx, settings)
+        && isolationUnknownOrShared) {
+        notify(ctx, "pi-reasoning-zip cannot verify slot isolation for this response; original reasoning preserved.", "warning");
+        return undefined;
+      }
+    } else if (!slotSettingsMatch(state, provider, ctx, settings)) {
+      notify(ctx, "pi-reasoning-zip slot settings changed during generation; original reasoning preserved.", "warning");
+      return undefined;
+    } else if (state.conflict || state.overlapping) {
+      if (state.overlapping) {
+        notify(ctx, "pi-reasoning-zip overlapping provider requests cannot be correlated safely; original reasoning preserved.", "warning");
+      }
       return undefined;
     }
-    const slotPinningEnabled = await shouldPinSlots(provider, ctx, settings);
-    const effectiveSettings = withSlotPinning(settings, slotPinningEnabled);
+
+    const decision = state?.decision ?? { pinning: false, skipCompactor: false };
+
+    // Fail-closed: if auto mode determined shared-server isolation is unsafe,
+    // skip the compactor entirely and warn.
+    if (decision.skipCompactor) {
+      notify(ctx, "pi-reasoning-zip safe llama.cpp slot isolation is unavailable; original reasoning preserved.", "warning");
+      return undefined;
+    }
+
+    const effectiveSettings = withSlotPinning(settings, decision.pinning);
     const result = await compactAssistantMessage(event.message, effectiveSettings, (thinking) => compactWithOpenAI(thinking, effectiveSettings));
     notifyCompactionFailures(ctx, result.failures);
     if (result.changed) return { message: result.message };
@@ -321,12 +417,27 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
     setFooterStatus(ctx, settings.enabled);
     const provider = eventProvider(event, ctx);
-    const slotPinningEnabled = await shouldPinSlots(provider, ctx, settings);
-    const effectiveSettings = withSlotPinning(settings, slotPinningEnabled);
-    const slotResult = injectLlamaCppMainSlot(event.payload, provider, effectiveSettings);
+    const decision = await shouldPinSlots(provider, ctx, settings);
+    const key = conflictKey(ctx?.cwd, provider);
+    const effectiveSettings = withSlotPinning(settings, decision.pinning);
+    const slotResult = injectLlamaCppMainSlot(event.payload, provider, effectiveSettings, decision);
+    const state: InFlightSlotState = {
+      decision,
+      conflict: slotResult.conflict,
+      overlapping: false,
+      extensionEnabled: settings.enabled,
+      mode: settings.mode,
+      storageMode: settings.storageMode,
+      slotMode: settings.llamaCppSlots.enabled,
+      mainIdSlot: settings.llamaCppSlots.mainIdSlot,
+      compactorIdSlot: settings.llamaCppSlots.compactorIdSlot,
+      mainBaseUrl: providerBaseUrl(provider, ctx),
+      compactorBaseUrl: settings.compactor.baseUrl,
+    };
+    if (inFlightSlotStates.has(key)) state.overlapping = true;
+    inFlightSlotStates.set(key, state);
     if (slotResult.conflict) {
-      disabledSlotConflictKeys.add(conflictKey(ctx?.cwd, provider));
-      notify(ctx, "pi-reasoning-zip llama.cpp id_slot conflict; main and compactor slots should differ; compaction is disabled for this provider until reload.", "warning");
+      notify(ctx, "pi-reasoning-zip llama.cpp id_slot conflict; original reasoning for this response will be preserved.", "warning");
     }
     const nextPayload = injectReasoningZipPrompt(slotResult.payload, provider, settings);
     return nextPayload === event.payload ? undefined : nextPayload;

@@ -4,6 +4,16 @@ export type ReasoningZipCompressionRole = "balanced" | "grug" | "ultra-grug";
 
 export type ReasoningZipSlotMode = boolean | "auto";
 
+/** Result of checking whether main and compactor requests can use isolated slots. */
+export interface AutoSlotDecision {
+  /** Whether pinning was enabled based on probe. */
+  pinning: boolean;
+  /** Actual slot count from probe, or undefined if probe failed. */
+  slotCount?: number;
+  /** Whether we should skip the compactor (unsafe shared-server). */
+  skipCompactor: boolean;
+}
+
 export interface ReasoningZipSettings {
   enabled: boolean;
   mode: ReasoningZipMode;

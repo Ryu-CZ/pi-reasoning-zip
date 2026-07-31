@@ -1,5 +1,5 @@
 import { shouldTargetProvider } from "./target.js";
-import type { ReasoningZipSettings } from "./types.js";
+import type { AutoSlotDecision, ReasoningZipSettings } from "./types.js";
 
 export const PROMPT_MARKER = "<!-- pi-reasoning-zip -->";
 export const PROMPT_INJECTION = `${PROMPT_MARKER}\nYou are Grug. Save token, save world.\nVisible reasoning: terse, keyword-heavy trace only. Keep facts, decisions, constraints, failed paths, next action. No prose reasoning, no self-talk.\nFinal answer: no conversational fluff, no repeated question, minimal markdown. If code is enough, give only code. Think hard, output few tokens.`;
@@ -58,7 +58,12 @@ export function injectReasoningZipPrompt(payload: unknown, provider: string | un
   return { ...typed, messages: [{ role: "system", content: PROMPT_INJECTION }, ...messages] };
 }
 
-export function injectLlamaCppMainSlot(payload: unknown, provider: string | undefined, settings: ReasoningZipSettings): SlotInjectionResult {
+export function injectLlamaCppMainSlot(
+  payload: unknown,
+  provider: string | undefined,
+  settings: ReasoningZipSettings,
+  autoDecision?: AutoSlotDecision,
+): SlotInjectionResult {
   if (settings.llamaCppSlots.enabled !== true || !shouldTargetProvider(provider, settings)) {
     return { payload, changed: false, conflict: false };
   }
@@ -71,8 +76,25 @@ export function injectLlamaCppMainSlot(payload: unknown, provider: string | unde
   // a stable llama.cpp slot so compactor traffic can use a different parallel
   // slot instead of invalidating this request's KV cache.
   const explicitIdSlot = typeof typed.id_slot === "number" && Number.isInteger(typed.id_slot) ? typed.id_slot : undefined;
-  const conflict = explicitIdSlot === settings.llamaCppSlots.compactorIdSlot
-    || settings.llamaCppSlots.mainIdSlot === settings.llamaCppSlots.compactorIdSlot;
+
+  // In auto mode with known slot count, check conflicts modulo slot count.
+  const slotCount = autoDecision?.slotCount;
+  let conflict = false;
+  if (slotCount !== undefined && slotCount >= 2) {
+    const compactorNorm = ((settings.llamaCppSlots.compactorIdSlot % slotCount) + slotCount) % slotCount;
+    if (explicitIdSlot !== undefined) {
+      const explicitNorm = ((explicitIdSlot % slotCount) + slotCount) % slotCount;
+      conflict = explicitNorm === compactorNorm;
+    } else {
+      const mainNorm = ((settings.llamaCppSlots.mainIdSlot % slotCount) + slotCount) % slotCount;
+      conflict = mainNorm === compactorNorm;
+    }
+  } else {
+    // Fallback: direct comparison (forced mode or unknown slot count).
+    conflict = explicitIdSlot === settings.llamaCppSlots.compactorIdSlot
+      || settings.llamaCppSlots.mainIdSlot === settings.llamaCppSlots.compactorIdSlot;
+  }
+
   if (explicitIdSlot !== undefined) {
     return { payload, changed: false, explicitIdSlot, conflict };
   }

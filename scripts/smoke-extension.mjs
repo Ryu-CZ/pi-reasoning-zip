@@ -14,6 +14,7 @@ try {
     join(cwd, ".pi", "settings.json"),
     JSON.stringify({
       reasoningZip: {
+        enabled: true,
         mode: "llama-only",
         thresholds: { minChars: 5, maxTraceChars: 100 },
         compactor: { baseUrl: "http://mock.local/v1", model: "mock", timeoutMs: 1000 },
@@ -59,7 +60,7 @@ try {
     assert(compacted.message.content[1].thinking === "facts:\n- smoke compacted", "thinking block was not compacted");
     assert(compacted.message.metadata.keep === true, "assistant metadata was not preserved");
 
-    const injected = handlers.get("before_provider_request")(
+    const injected = await handlers.get("before_provider_request")(
       {
         provider: "llama-server=http://127.0.0.1:7484",
         payload: { messages: [{ role: "system", content: "sys" }, { role: "user", content: "hi" }] },
@@ -68,7 +69,7 @@ try {
     );
     assert(injected.messages[0].content.includes("<!-- pi-reasoning-zip -->"), "prompt marker was not injected");
 
-    const skipped = handlers.get("before_provider_request")(
+    const skipped = await handlers.get("before_provider_request")(
       { provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } },
       { cwd },
     );

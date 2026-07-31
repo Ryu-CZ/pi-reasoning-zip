@@ -256,6 +256,7 @@ describe("extension entrypoint", () => {
       mode: "llama-only",
       injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { apiKey: "slot-secret" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
     });
     const handlers = loadExtension();
@@ -269,6 +270,8 @@ describe("extension entrypoint", () => {
       { cwd },
     );
     expect(pinned.id_slot).toBe(0);
+    expect(pinned.cache_prompt).toBe(true);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).headers).toEqual({ authorization: "Bearer slot-secret" });
 
     const result = await handlers.get("message_end")!(
       { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7484", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
@@ -306,14 +309,13 @@ describe("extension entrypoint", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("before_provider_request reuses the auto slot probe result", async () => {
+  it("before_provider_request deduplicates concurrent auto slot probes", async () => {
     const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7486/v1" } });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
     const handler = loadExtension().get("before_provider_request")!;
     const event = { provider: "llama-server=http://127.0.0.1:7486", payload: { messages: [{ role: "system", content: "sys" }] } };
 
-    await handler(event, { cwd });
-    await handler(event, { cwd });
+    await Promise.all([handler(event, { cwd }), handler(event, { cwd })]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -331,6 +333,233 @@ describe("extension entrypoint", () => {
     expect(result).toBeUndefined();
   });
 
+  it("disabled auto mode does not probe or warn", async () => {
+    const cwd = await tempProject({
+      enabled: false,
+      mode: "llama-only",
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const notifications: string[] = [];
+    const ctx = { cwd, ui: { notify: (message: string) => notifications.push(message) } };
+
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7489", payload: { messages: [] } },
+      ctx,
+    );
+    await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7489", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notifications).toEqual([]);
+  });
+
+  it("storage-off auto mode does not probe or pin", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      storageMode: "off",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    const result = await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7489", payload: { messages: [] } },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("enabling auto mode during a generation fails closed", async () => {
+    const cwd = await tempProject({
+      enabled: false,
+      mode: "llama-only",
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7489", payload: { messages: [] } },
+      ctx,
+    );
+    await writeFile(join(cwd, ".pi", "settings.json"), JSON.stringify({ reasoningZip: {
+      enabled: true,
+      mode: "llama-only",
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    } }), "utf8");
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7489", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip slot settings changed during generation; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode without a matching main-request decision fails closed", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7489", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip cannot verify slot isolation for this response; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode with an unknown main endpoint and no request decision fails closed", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const notifications: string[] = [];
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llamacpp", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd, ui: { notify: (message: string) => notifications.push(message) } },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notifications).toEqual([
+      "pi-reasoning-zip cannot verify slot isolation for this response; original reasoning preserved.",
+    ]);
+  });
+
+  it("auto mode with an unknown main endpoint fails closed through the normal lifecycle", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const notifications: string[] = [];
+    const ctx = { cwd, ui: { notify: (message: string) => notifications.push(message) } };
+
+    await handlers.get("before_provider_request")!(
+      { provider: "llamacpp", payload: { messages: [] } },
+      ctx,
+    );
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llamacpp", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(notifications).toEqual([
+      "pi-reasoning-zip safe llama.cpp slot isolation is unavailable; original reasoning preserved.",
+    ]);
+  });
+
+  it("overlapping same-provider requests both fail closed", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
+    const notifications: string[] = [];
+    const ctx = { cwd, ui: { notify: (message: string) => notifications.push(message) } };
+    const provider = "llama-server=http://127.0.0.1:7489";
+
+    await Promise.all([
+      handlers.get("before_provider_request")!({ provider, payload: { messages: [] } }, ctx),
+      handlers.get("before_provider_request")!({ provider, payload: { messages: [] } }, ctx),
+    ]);
+    const message = { role: "assistant", provider, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
+    expect(await handlers.get("message_end")!({ message }, ctx)).toBeUndefined();
+    expect(await handlers.get("message_end")!({ message }, ctx)).toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(notifications).toEqual([
+      "pi-reasoning-zip overlapping provider requests cannot be correlated safely; original reasoning preserved.",
+      "pi-reasoning-zip cannot verify slot isolation for this response; original reasoning preserved.",
+    ]);
+  });
+
+  it("recovers after an abandoned provider request", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
+    const notifications: string[] = [];
+    const ctx = { cwd, ui: { notify: (message: string) => notifications.push(message) } };
+    const provider = "llama-server=http://127.0.0.1:7489";
+    const request = { provider, payload: { messages: [] } };
+    const message = { role: "assistant", provider, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
+
+    await handlers.get("before_provider_request")!(request, ctx); // abandoned: no message_end
+    await handlers.get("before_provider_request")!(request, ctx);
+    expect(await handlers.get("message_end")!({ message }, ctx)).toBeUndefined();
+
+    await handlers.get("before_provider_request")!(request, ctx);
+    const recovered = await handlers.get("message_end")!({ message }, ctx);
+
+    expect(recovered.message.content[0].thinking).toBe("zip");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(notifications).toEqual([
+      "pi-reasoning-zip overlapping provider requests cannot be correlated safely; original reasoning preserved.",
+    ]);
+  });
+
   it("before_provider_request warns when an explicit main id_slot conflicts with compactor id_slot", async () => {
     const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
     const handlers = loadExtension();
@@ -344,7 +573,7 @@ describe("extension entrypoint", () => {
 
     expect(result).toBeUndefined();
     expect(notifications).toEqual([
-      { message: "pi-reasoning-zip llama.cpp id_slot conflict; main and compactor slots should differ; compaction is disabled for this provider until reload.", level: "warning" },
+      { message: "pi-reasoning-zip llama.cpp id_slot conflict; original reasoning for this response will be preserved.", level: "warning" },
     ]);
 
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -381,5 +610,210 @@ describe("extension entrypoint", () => {
     );
 
     expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+  });
+
+  // ---- cache-isolation hardening tests ----
+
+  it("auto mode: probe failure causes no compactor call and warns", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7490/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    // Probe fails (network error).
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network error"));
+
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7490", payload: { messages: [{ role: "system", content: "sys" }] } },
+      ctx,
+    );
+
+    // message_end should NOT call the compactor and should warn.
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7490", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip safe llama.cpp slot isolation is unavailable; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode: one slot causes no compactor call and warns", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7491/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    // Probe returns only one slot.
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }] } as Response);
+
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7491", payload: { messages: [{ role: "system", content: "sys" }] } },
+      ctx,
+    );
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7491", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip safe llama.cpp slot isolation is unavailable; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode: 2 slots with configured main=0/compactor=2 causes no compactor call (modulo collision)", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 2 },
+      compactor: { baseUrl: "http://127.0.0.1:7492/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    // Probe returns 2 slots — 0 and 2 collide modulo 2.
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
+
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7492", payload: { messages: [{ role: "system", content: "sys" }] } },
+      ctx,
+    );
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7492", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip safe llama.cpp slot isolation is unavailable; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode: explicit main id_slot modulo-conflict disables compaction", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 2 },
+      compactor: { baseUrl: "http://127.0.0.1:7493/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    // 3 slots — configured main=0 and compactor=2 don't collide (0%3=0, 2%3=2).
+    // But explicit id_slot=5 collides with compactorIdSlot=2 modulo 3 (5%3=2, 2%3=2).
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }, { id: 2 }] } as Response);
+
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+    const result = await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7493", payload: { id_slot: 5, messages: [{ role: "system", content: "sys" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip llama.cpp id_slot conflict; original reasoning for this response will be preserved.", level: "warning" },
+    ]);
+
+    const messageEndResult = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7493", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+    expect(messageEndResult).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto mode: settings changed during generation fail closed", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7495/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    const ctx = { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } };
+
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7495", payload: { messages: [] } },
+      ctx,
+    );
+    await writeFile(join(cwd, ".pi", "settings.json"), JSON.stringify({ reasoningZip: {
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 0 },
+      compactor: { baseUrl: "http://127.0.0.1:7495/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    } }), "utf8");
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7495", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip slot settings changed during generation; original reasoning preserved.", level: "warning" },
+    ]);
+  });
+
+  it("auto mode: message_end uses the decision from its main request without re-probing", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://127.0.0.1:7494/v1" },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }, { id: 2 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
+
+    // before_provider_request probes and pins.
+    await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7494", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+
+    // message_end must use the decision that governed the actual main request.
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7494", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } },
+    );
+
+    expect(result.message.content[0].thinking).toBe("zip");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(notifications).toEqual([]);
   });
 });

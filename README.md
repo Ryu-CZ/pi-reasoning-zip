@@ -84,7 +84,7 @@ Without an explicit scope, writes update the nearest existing `reasoningZip` set
 - **Forward-only compaction** — modifies only the new assistant message being finalized.
 - **Stored compact traces** — future turns naturally replay compact `thinking` because that is what Pi stored.
 - **Local compactor** — calls a configured OpenAI-compatible `/chat/completions` endpoint directly.
-- **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:7484`.
+- **llama.cpp-first targeting** — defaults to llama.cpp-like providers such as `llama-server=http://127.0.0.1:8080`.
 - **Prompt minimization** — optional grug-style request injection for target local providers.
 - **Fail-open safety** — preserves original messages on errors, timeouts, invalid output, or unknown payloads.
 - **Opaque reasoning guard** — skips signed, encrypted, redacted, or provider-opaque reasoning metadata while allowing llama.cpp's plain `reasoning_content` traces.
@@ -93,6 +93,8 @@ Without an explicit scope, writes update the nearest existing `reasoningZip` set
 ## Configuration
 
 Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.json` under the `reasoningZip` key. Project settings take precedence.
+
+Example configuration for a shared local llama.cpp server (slot pinning is opt-in, so this is not a dump of built-in defaults):
 
 ```json
 {
@@ -109,7 +111,7 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
       "compactorIdSlot": 1
     },
     "compactor": {
-      "baseUrl": "http://127.0.0.1:7484/v1",
+      "baseUrl": "http://127.0.0.1:8080/v1",
       "model": "Qwen3.6-27B",
       "apiKey": "sk-placeholder",
       "maxTokens": 512,
@@ -161,11 +163,46 @@ Slots matter because llama.cpp stores each request's evaluated prompt and genera
 
 `--parallel N` creates N llama.cpp slots. With `--parallel 2` or higher, the main conversation and the compactor can be isolated by pinning them to different `id_slot` values. With only one slot, both requests must share the same KV state, so pinning cannot prevent invalidation.
 
-To avoid the compactor evicting the main conversation's prompt/KV cache on a shared llama.cpp server, run llama.cpp with at least two slots and pin both request classes:
+**Built-in default is `llamaCppSlots.enabled: false` (opt-in).** Slot pinning is disabled by default to maintain compatibility with servers that don't support it.
+
+### Recommended llama.cpp server settings
+
+For a main Pi model and reasoning compactor sharing one llama.cpp server, use this cache-isolation baseline in addition to your model and hardware-specific options:
 
 ```bash
-llama-server ... --parallel 2 --no-cache-idle-slots
+llama-server \
+  --model /path/to/Qwen3.6-27B.gguf \
+  --alias Qwen3.6-27B \
+  --parallel 2 \
+  --kv-unified \
+  --no-cache-idle-slots \
+  --slots
 ```
+
+The cache-relevant options are:
+
+| llama.cpp option | Why it is recommended |
+|---|---|
+| `--parallel 2` | Creates separate slots for Pi (`id_slot: 0`) and the compactor (`id_slot: 1`). Two is the minimum; use more only for other concurrent workloads. |
+| `--kv-unified` | Lets the long Pi conversation and short compactor request share the total KV capacity dynamically instead of splitting it equally between slots. |
+| `--no-cache-idle-slots` | Prevents starting the compactor from saving and clearing Pi's idle slot in unified-KV mode. |
+| `--slots` | Keeps `GET /slots` available so `llamaCppSlots.enabled: "auto"` can verify the actual slot count. The endpoint is currently enabled by default, but setting it explicitly documents the dependency. |
+
+Keep the server on a trusted interface such as `127.0.0.1`; `/slots` exposes runtime information. Model path, context size, GPU offload, flash attention, sampling, and speculative-decoding flags depend on your hardware and model and are intentionally not prescribed here.
+
+After startup, verify that llama.cpp reports at least two slots:
+
+```bash
+curl -sS http://127.0.0.1:8080/slots
+```
+
+The response should be a JSON array containing at least two entries with distinct IDs, normally `0` and `1`.
+
+Unified KV is recommended when the Pi conversation is much longer than the reasoning block being compacted because either slot can use the available capacity. Keep enough total KV headroom for both requests: if the main conversation fills the entire cache, llama.cpp may still need to purge idle state to run the compactor.
+
+For strict fixed-partition isolation, replace `--kv-unified` with `--no-kv-unified`. The configured `--ctx-size` is then divided evenly across the slots, so `--parallel 2` gives each slot half of the total capacity; unused compactor capacity cannot be borrowed by Pi.
+
+### Extension settings
 
 ```json
 {
@@ -179,9 +216,17 @@ llama-server ... --parallel 2 --no-cache-idle-slots
 }
 ```
 
-Set `llamaCppSlots.enabled` to `"auto"` to enable pinning only when the main provider and compactor share the same llama.cpp server endpoint (after normalizing a trailing `/v1`) and llama.cpp's `GET /slots` endpoint reports at least two slots. The `/slots` endpoint is enabled by default in current llama.cpp but can be disabled with `--no-slots`; if the probe fails, auto mode leaves requests unpinned. Set `enabled` to `true` to force pinning without probing when you know the shared server has enough slots, or `false` to disable slot pinning.
+This is the recommended shared-server configuration, not the built-in default. Set `llamaCppSlots.enabled` to `"auto"` to enable pinning only when the main provider and compactor share the same llama.cpp server endpoint (after normalizing a trailing `/v1`), `GET /slots` reports at least two slots, and the configured IDs do not collide. Set it to `true` to force pinning without probing only when you guarantee valid distinct slots, or `false` to disable pinning. The `/slots` endpoint is enabled by default in current llama.cpp but can be disabled with `--no-slots`.
+
+### Behavior and safeguards
+
+**Auto mode fails closed for shared servers:** if the probe fails, the slot count is less than 2, or the configured IDs collide modulo the slot count (e.g., IDs 0 and 2 with 2 slots), the compactor request is skipped entirely, the original reasoning is preserved, and a UI warning is shown. This is not treated as a compaction failure. Different main/compactor endpoints remain safe and compact normally without pinning. Forced `true` remains user-managed.
+
+**ID wrapping:** llama.cpp wraps slot IDs modulo the slot count. Auto mode normalizes configured IDs and detects collisions (e.g., `mainIdSlot: 0` and `compactorIdSlot: 2` collide with 2 slots since `2 % 2 = 0`). Explicit main `id_slot` values are also checked modulo the slot count.
 
 When slot pinning is active, the `before_provider_request` hook adds `id_slot: mainIdSlot` and `cache_prompt: true` to targeted main Pi requests that do not already contain `id_slot`. Existing explicit `id_slot` values are never overwritten; if an explicit main request uses the configured compactor slot, the extension warns. Compactor calls send `id_slot: compactorIdSlot` and `cache_prompt: true`.
+
+Each eligible shared-server main request in auto mode gets a fresh `/slots` probe using the configured compactor API key (concurrent probes are deduplicated). The resulting decision is retained for that request and consumed by its `message_end`, so the compactor cannot run under a different slot assumption than the main request. If slot settings change during generation, no matching request decision is available, or same-provider requests overlap and cannot be correlated safely, the original reasoning is preserved.
 
 Use `id_slot`, not the older/incorrect `slot_id` name. With `--parallel 1`, slot IDs wrap to the only slot and cannot prevent cache invalidation; use a separate compactor server or llama.cpp slot save/restore instead. `cache_prompt: false` is not an ephemeral/no-store mode and can clear the selected slot's reusable state.
 

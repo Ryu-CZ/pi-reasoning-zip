@@ -10,9 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added optional llama.cpp slot pinning to keep reasoning-zip compaction from invalidating the main chat prompt/KV cache on shared local servers:
-  - `llamaCppSlots.enabled`: set to `"auto"` to pin only when the main model and compactor share a llama.cpp server with at least two slots, `true` to force pinning for llama.cpp-targeted requests without probing `GET /slots`, or `false` to disable slot pinning.
+  - `llamaCppSlots.enabled`: set to `"auto"` to pin only when the main model and compactor share a llama.cpp server with at least two non-colliding configured slots, `true` to force pinning for llama.cpp-targeted requests without probing `GET /slots`, or `false` to disable slot pinning.
   - `llamaCppSlots.mainIdSlot`: llama.cpp `id_slot` used for normal Pi chat requests when pinning is active.
   - `llamaCppSlots.compactorIdSlot`: llama.cpp `id_slot` used for reasoning-zip compactor requests when pinning is active.
+  - Auto mode probes the actual `/slots` count for each main request and reuses that request's decision at `message_end`.
+  - Probe failure, fewer than two slots, or IDs that collide after llama.cpp's modulo wrapping skip compaction and preserve the original reasoning.
+  - Existing explicit main `id_slot` values are preserved and checked for conflicts with the compactor slot.
 
 ## [0.4.0] - 2026-07-14
 

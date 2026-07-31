@@ -20,6 +20,19 @@ function hasOpaqueReasoningMetadata(block: PiMessageBlock): boolean {
   );
 }
 
+function isCompactableThinkingBlock(block: PiMessageBlock, settings: ReasoningZipSettings): block is PiMessageBlock & { thinking: string } {
+  return isThinkingBlock(block)
+    && !hasOpaqueReasoningMetadata(block)
+    && block.thinking.length >= settings.thresholds.minChars
+    && block.thinking.length <= settings.thresholds.maxInputChars;
+}
+
+export function hasCompactionCandidate(message: PiMessage, settings: ReasoningZipSettings): boolean {
+  if (!shouldHandleMessage(message, settings) || !Array.isArray(message.content)) return false;
+  if (message.content.some((block) => block.type === "toolCall")) return false;
+  return message.content.some((block) => isCompactableThinkingBlock(block, settings));
+}
+
 function acceptableCompaction(original: string, compacted: string, settings: ReasoningZipSettings): string | undefined {
   const text = compacted.trim();
   if (!text || text === "none") return undefined;
@@ -33,19 +46,11 @@ export async function compactAssistantMessage(
   settings: ReasoningZipSettings,
   compactText: CompactText,
 ): Promise<{ message: PiMessage; changed: boolean; failures: number }> {
-  if (!shouldHandleMessage(message, settings)) return { message, changed: false, failures: 0 };
-  if (!Array.isArray(message.content)) return { message, changed: false, failures: 0 };
-  // Tool-call continuations may depend on the exact preceding reasoning. Until
-  // that flow is verified end-to-end, preserve the complete assistant message.
-  if (message.content.some((block) => block.type === "toolCall")) return { message, changed: false, failures: 0 };
+  if (!hasCompactionCandidate(message, settings)) return { message, changed: false, failures: 0 };
+  const content = message.content as PiMessageBlock[];
 
-  const results = await Promise.all(message.content.map(async (block): Promise<{ block: PiMessageBlock; changed: boolean; failures: number }> => {
-    if (
-      !isThinkingBlock(block)
-      || hasOpaqueReasoningMetadata(block)
-      || block.thinking.length < settings.thresholds.minChars
-      || block.thinking.length > settings.thresholds.maxInputChars
-    ) {
+  const results = await Promise.all(content.map(async (block): Promise<{ block: PiMessageBlock; changed: boolean; failures: number }> => {
+    if (!isCompactableThinkingBlock(block, settings)) {
       return { block, changed: false, failures: 0 };
     }
 
