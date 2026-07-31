@@ -40,6 +40,34 @@ describe("compactWithOpenAI", () => {
     expect(body.messages[1].content).toContain("Compression role: ultra-grug");
   });
 
+  it("pins compactor requests to the configured llama.cpp slot", async () => {
+    const slotSettings = resolveReasoningZipSettings({
+      llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://local.test/v1", model: "zip", apiKey: "key" },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+
+    await compactWithOpenAI("thinking", slotSettings);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.id_slot).toBe(1);
+    expect(body.cache_prompt).toBe(true);
+  });
+
+  it("rejects conflicting main and compactor llama.cpp slots", async () => {
+    const slotSettings = resolveReasoningZipSettings({
+      llamaCppSlots: { enabled: true, mainIdSlot: 1, compactorIdSlot: 1 },
+      compactor: { baseUrl: "http://local.test/v1", model: "zip", apiKey: "key" },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(compactWithOpenAI("thinking", slotSettings)).rejects.toThrow("id_slot must differ");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("throws on HTTP error", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 500 } as Response);
     await expect(compactWithOpenAI("thinking", settings)).rejects.toThrow("Compactor HTTP 500");

@@ -103,6 +103,11 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
     "compressionRole": "grug",
     "injectPrompt": true,
     "footerStatus": "🗜️ Zip",
+    "llamaCppSlots": {
+      "enabled": "auto",
+      "mainIdSlot": 0,
+      "compactorIdSlot": 1
+    },
     "compactor": {
       "baseUrl": "http://127.0.0.1:7484/v1",
       "model": "Qwen3.6-27B",
@@ -147,6 +152,38 @@ Settings live in project `.pi/settings.json` or global `~/.pi/agent/settings.jso
 | `balanced` | concise bullets while preserving extra context |
 | `grug` | terse, keyword-heavy default |
 | `ultra-grug` | most aggressive fragment-style trace |
+
+## llama.cpp slot pinning
+
+By default, Pi does not send llama.cpp's `id_slot` field, so llama.cpp treats main requests as `id_slot: -1` and auto-selects a slot. This extension cannot inspect the final auto-assigned slot through Pi's `before_provider_request` hook; it can only see and preserve an explicit `id_slot` already present in the outgoing payload.
+
+Slots matter because llama.cpp stores each request's evaluated prompt and generated tokens in a slot's KV cache. That cache is what makes the next turn fast: the server can reuse the long common prefix of the conversation instead of re-processing it. A reasoning-zip compaction call is a second, unrelated chat completion request. If llama.cpp auto-selects the same slot for that short compaction request, the slot's cached main conversation state can be truncated or replaced by the compactor prompt/output. On the following user turn, the main conversation may lose its prompt-cache/KV-cache hit and pay the full prompt processing cost again.
+
+`--parallel N` creates N llama.cpp slots. With `--parallel 2` or higher, the main conversation and the compactor can be isolated by pinning them to different `id_slot` values. With only one slot, both requests must share the same KV state, so pinning cannot prevent invalidation.
+
+To avoid the compactor evicting the main conversation's prompt/KV cache on a shared llama.cpp server, run llama.cpp with at least two slots and pin both request classes:
+
+```bash
+llama-server ... --parallel 2 --no-cache-idle-slots
+```
+
+```json
+{
+  "reasoningZip": {
+    "llamaCppSlots": {
+      "enabled": "auto",
+      "mainIdSlot": 0,
+      "compactorIdSlot": 1
+    }
+  }
+}
+```
+
+Set `llamaCppSlots.enabled` to `"auto"` to enable pinning only when the main provider and compactor share the same llama.cpp server endpoint (after normalizing a trailing `/v1`) and llama.cpp's `GET /slots` endpoint reports at least two slots. The `/slots` endpoint is enabled by default in current llama.cpp but can be disabled with `--no-slots`; if the probe fails, auto mode leaves requests unpinned. Set `enabled` to `true` to force pinning without probing when you know the shared server has enough slots, or `false` to disable slot pinning.
+
+When slot pinning is active, the `before_provider_request` hook adds `id_slot: mainIdSlot` and `cache_prompt: true` to targeted main Pi requests that do not already contain `id_slot`. Existing explicit `id_slot` values are never overwritten; if an explicit main request uses the configured compactor slot, the extension warns. Compactor calls send `id_slot: compactorIdSlot` and `cache_prompt: true`.
+
+Use `id_slot`, not the older/incorrect `slot_id` name. With `--parallel 1`, slot IDs wrap to the only slot and cannot prevent cache invalidation; use a separate compactor server or llama.cpp slot save/restore instead. `cache_prompt: false` is not an ephemeral/no-store mode and can clear the selected slot's reusable state.
 
 ## Compactor endpoint
 

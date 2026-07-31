@@ -6,7 +6,14 @@ export const PROMPT_INJECTION = `${PROMPT_MARKER}\nYou are Grug. Save token, sav
 
 type ChatMessage = { role?: unknown; content?: unknown; [key: string]: unknown };
 
-type Payload = { messages?: unknown; [key: string]: unknown };
+type Payload = { messages?: unknown; id_slot?: unknown; cache_prompt?: unknown; [key: string]: unknown };
+
+export interface SlotInjectionResult {
+  payload: unknown;
+  changed: boolean;
+  explicitIdSlot?: number;
+  conflict: boolean;
+}
 
 function contentHasMarker(content: unknown): boolean {
   if (typeof content === "string") return content.includes(PROMPT_MARKER);
@@ -49,4 +56,30 @@ export function injectReasoningZipPrompt(payload: unknown, provider: string | un
   }
 
   return { ...typed, messages: [{ role: "system", content: PROMPT_INJECTION }, ...messages] };
+}
+
+export function injectLlamaCppMainSlot(payload: unknown, provider: string | undefined, settings: ReasoningZipSettings): SlotInjectionResult {
+  if (settings.llamaCppSlots.enabled !== true || !shouldTargetProvider(provider, settings)) {
+    return { payload, changed: false, conflict: false };
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { payload, changed: false, conflict: false };
+  }
+
+  const typed = payload as Payload;
+  // Preserve user/Pi-provided id_slot. If none exists, pin the main request to
+  // a stable llama.cpp slot so compactor traffic can use a different parallel
+  // slot instead of invalidating this request's KV cache.
+  const explicitIdSlot = typeof typed.id_slot === "number" && Number.isInteger(typed.id_slot) ? typed.id_slot : undefined;
+  const conflict = explicitIdSlot === settings.llamaCppSlots.compactorIdSlot
+    || settings.llamaCppSlots.mainIdSlot === settings.llamaCppSlots.compactorIdSlot;
+  if (explicitIdSlot !== undefined) {
+    return { payload, changed: false, explicitIdSlot, conflict };
+  }
+
+  return {
+    payload: { ...typed, id_slot: settings.llamaCppSlots.mainIdSlot, cache_prompt: typed.cache_prompt ?? true },
+    changed: true,
+    conflict,
+  };
 }

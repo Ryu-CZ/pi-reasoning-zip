@@ -8,25 +8,31 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.storageMode).toBe("compact-new");
     expect(settings.compressionRole).toBe("grug");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
+    expect(settings.llamaCppSlots).toEqual({ enabled: false, mainIdSlot: 0, compactorIdSlot: 1 });
     expect(settings.thresholds.maxInputChars).toBe(50000);
     expect(settings.footerStatus).toBe("🗜️ Zip");
   });
 
   it("merges partial config", () => {
-    const settings = resolveReasoningZipSettings({ mode: "all", compressionRole: "ultra-grug", footerStatus: "Zip On", compactor: { model: "zipper" }, thresholds: { minChars: 10, maxInputChars: 20000 } });
+    const settings = resolveReasoningZipSettings({ mode: "all", compressionRole: "ultra-grug", footerStatus: "Zip On", llamaCppSlots: { enabled: true, mainIdSlot: 2, compactorIdSlot: 3 }, compactor: { model: "zipper" }, thresholds: { minChars: 10, maxInputChars: 20000 } });
     expect(settings.mode).toBe("all");
     expect(settings.compressionRole).toBe("ultra-grug");
     expect(settings.compactor.model).toBe("zipper");
+    expect(settings.llamaCppSlots).toEqual({ enabled: true, mainIdSlot: 2, compactorIdSlot: 3 });
     expect(settings.thresholds.minChars).toBe(10);
     expect(settings.thresholds.maxInputChars).toBe(20000);
     expect(settings.injectPrompt).toBe(true);
     expect(settings.footerStatus).toBe("Zip On");
   });
 
-  it("falls back for invalid enums", () => {
-    const settings = resolveReasoningZipSettings({ mode: "bad", storageMode: "rewrite-all", compressionRole: "word-soup" });
+  it("accepts auto slot mode and falls back for invalid enums", () => {
+    const autoSettings = resolveReasoningZipSettings({ llamaCppSlots: { enabled: "auto" } });
+    expect(autoSettings.llamaCppSlots.enabled).toBe("auto");
+
+    const settings = resolveReasoningZipSettings({ mode: "bad", storageMode: "rewrite-all", compressionRole: "word-soup", llamaCppSlots: { enabled: "bad" } });
     expect(settings.mode).toBe("local-only");
     expect(settings.storageMode).toBe("compact-new");
     expect(settings.compressionRole).toBe("grug");
+    expect(settings.llamaCppSlots.enabled).toBe(false);
   });
 });

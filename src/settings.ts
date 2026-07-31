@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import type { ReasoningZipCompressionRole, ReasoningZipMode, ReasoningZipSettings, ReasoningZipStorageMode } from "./types.js";
+import type { ReasoningZipCompressionRole, ReasoningZipMode, ReasoningZipSettings, ReasoningZipSlotMode, ReasoningZipStorageMode } from "./types.js";
 
 export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   enabled: true,
@@ -10,6 +10,11 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   compressionRole: "grug",
   injectPrompt: true,
   footerStatus: "🗜️ Zip",
+  llamaCppSlots: {
+    enabled: false,
+    mainIdSlot: 0,
+    compactorIdSlot: 1,
+  },
   compactor: {
     baseUrl: "http://127.0.0.1:7484/v1",
     model: "unsloth",
@@ -59,8 +64,16 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function slotModeValue(value: unknown, fallback: ReasoningZipSlotMode): ReasoningZipSlotMode {
+  return value === "auto" || typeof value === "boolean" ? value : fallback;
+}
+
 function numberValue(value: unknown, fallback: number, min = 0): number {
   return typeof value === "number" && Number.isFinite(value) && value >= min ? value : fallback;
+}
+
+function integerValue(value: unknown, fallback: number, min = 0): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= min ? value : fallback;
 }
 
 export function settingsPath(scope: SettingsScope, cwd = process.cwd()): string {
@@ -118,6 +131,7 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
   const root = asObject(input);
   const compactor = asObject(root.compactor);
   const thresholds = asObject(root.thresholds);
+  const llamaCppSlots = asObject(root.llamaCppSlots);
 
   const mode = modes.has(root.mode as ReasoningZipMode) ? (root.mode as ReasoningZipMode) : DEFAULT_SETTINGS.mode;
   const storageMode = storageModes.has(root.storageMode as ReasoningZipStorageMode)
@@ -134,6 +148,11 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
     compressionRole,
     injectPrompt: booleanValue(root.injectPrompt, DEFAULT_SETTINGS.injectPrompt),
     footerStatus: stringValue(root.footerStatus, DEFAULT_SETTINGS.footerStatus),
+    llamaCppSlots: {
+      enabled: slotModeValue(llamaCppSlots.enabled, DEFAULT_SETTINGS.llamaCppSlots.enabled),
+      mainIdSlot: integerValue(llamaCppSlots.mainIdSlot, DEFAULT_SETTINGS.llamaCppSlots.mainIdSlot, 0),
+      compactorIdSlot: integerValue(llamaCppSlots.compactorIdSlot, DEFAULT_SETTINGS.llamaCppSlots.compactorIdSlot, 0),
+    },
     compactor: {
       baseUrl: stringValue(compactor.baseUrl, DEFAULT_SETTINGS.compactor.baseUrl).replace(/\/$/, ""),
       model: stringValue(compactor.model, DEFAULT_SETTINGS.compactor.model),

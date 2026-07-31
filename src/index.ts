@@ -4,9 +4,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { compactWithOpenAI } from "./compactorClient.js";
 import { compactAssistantMessage } from "./messageTransform.js";
-import { injectReasoningZipPrompt } from "./promptInjection.js";
+import { injectLlamaCppMainSlot, injectReasoningZipPrompt } from "./promptInjection.js";
 import { inspectEnabledSetting, resolveReasoningZipSettings, type SettingsScope, writeEnabledSetting } from "./settings.js";
-import type { PiMessage } from "./types.js";
+import { isLlamaProvider } from "./target.js";
+import type { PiMessage, ReasoningZipSettings } from "./types.js";
 
 // Minimal structural types for the Pi hooks and command surface we consume.
 // Avoids `pi as any` while staying independent of upstream type changes.
@@ -15,7 +16,7 @@ const FOOTER_STATUS_KEY = "reasoning-zip";
 
 interface HookContext {
   cwd?: string;
-  model?: { provider?: string };
+  model?: { provider?: string; baseUrl?: string };
 }
 
 interface MessageEndEvent {
@@ -49,7 +50,7 @@ interface ReasoningZipExtension {
     handler: (
       event: BeforeProviderRequestEvent,
       ctx: HookContext,
-    ) => unknown | undefined,
+    ) => Promise<unknown | undefined> | unknown | undefined,
   ): void;
   on(event: "session_start" | "session_shutdown", handler: (event: unknown, ctx: HookContext) => unknown | undefined): void;
   registerCommand?(name: string, command: { description?: string; handler: (args: unknown, ctx: unknown) => unknown }): void;
@@ -110,6 +111,101 @@ function eventProvider(event: BeforeProviderRequestEvent, ctx: HookContext): str
   if (typeof event.provider === "string") return event.provider;
   if (typeof ctx.model?.provider === "string") return ctx.model.provider;
   return undefined;
+}
+
+function messageProvider(message: PiMessage, ctx: HookContext): string | undefined {
+  if (typeof message.provider === "string") return message.provider;
+  if (typeof ctx.model?.provider === "string") return ctx.model.provider;
+  return undefined;
+}
+
+function providerBaseUrl(provider: string | undefined, ctx: HookContext): string | undefined {
+  const prefix = "llama-server=";
+  if (provider?.toLowerCase().startsWith(prefix)) return provider.slice(prefix.length);
+  return typeof ctx.model?.baseUrl === "string" ? ctx.model.baseUrl : undefined;
+}
+
+function normalizedServerBase(baseUrl: string | undefined): string | undefined {
+  if (!baseUrl) return undefined;
+  try {
+    const url = new URL(baseUrl);
+    url.pathname = url.pathname.replace(/\/+$/, "").replace(/\/v1$/, "") || "/";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
+function sameServerEndpoint(a: string | undefined, b: string | undefined): boolean {
+  const first = normalizedServerBase(a);
+  const second = normalizedServerBase(b);
+  return first !== undefined && first === second;
+}
+
+function isSlotCapableProvider(provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): boolean {
+  return isLlamaProvider(provider) || sameServerEndpoint(providerBaseUrl(provider, ctx), settings.compactor.baseUrl);
+}
+
+function slotsUrl(baseUrl: string): string | undefined {
+  try {
+    const url = new URL(baseUrl);
+    url.pathname = url.pathname.replace(/\/+$/, "").replace(/\/v1$/, "") || "/";
+    url.pathname = `${url.pathname.replace(/\/+$/, "")}/slots`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function withSlotPinning(settings: ReasoningZipSettings, enabled: boolean): ReasoningZipSettings {
+  return { ...settings, llamaCppSlots: { ...settings.llamaCppSlots, enabled } };
+}
+
+const SLOT_PROBE_TTL_MS = 30000;
+const slotProbeCache = new Map<string, { expiresAt: number; result: boolean; pending?: Promise<boolean> }>();
+
+async function hasAtLeastTwoLlamaCppSlots(baseUrl: string): Promise<boolean> {
+  const url = slotsUrl(baseUrl);
+  if (!url) return false;
+  const now = Date.now();
+  const cached = slotProbeCache.get(url);
+  if (cached && cached.expiresAt > now) return cached.pending ?? cached.result;
+
+  const pending = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 500);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) return false;
+      const json = await response.json() as unknown;
+      return Array.isArray(json) && json.length >= 2;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  })();
+
+  slotProbeCache.set(url, { expiresAt: now + SLOT_PROBE_TTL_MS, result: false, pending });
+  const result = await pending;
+  slotProbeCache.set(url, { expiresAt: Date.now() + SLOT_PROBE_TTL_MS, result });
+  return result;
+}
+
+async function shouldPinSlots(provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): Promise<boolean> {
+  // Auto mode is conservative: only pin when the shared local llama.cpp server
+  // reports at least two parallel slots. With one slot, id_slot wraps to the
+  // only slot and cannot prevent prompt/KV cache invalidation.
+  if (!isSlotCapableProvider(provider, ctx, settings)) return false;
+  if (settings.llamaCppSlots.enabled === true) return true;
+  if (settings.llamaCppSlots.enabled !== "auto") return false;
+  const mainBaseUrl = providerBaseUrl(provider, ctx);
+  if (!sameServerEndpoint(mainBaseUrl, settings.compactor.baseUrl)) return false;
+  return await hasAtLeastTwoLlamaCppSlots(settings.compactor.baseUrl);
 }
 
 function cwdFromContext(ctx: unknown): string {
@@ -184,8 +280,13 @@ async function handleReasoningZipCommand(args: unknown, ctx: unknown): Promise<s
   return message;
 }
 
+function conflictKey(cwd: string | undefined, provider: string | undefined): string {
+  return `${cwd ?? ""}\n${provider ?? ""}`;
+}
+
 export default function reasoningZipExtension(pi: ExtensionAPI) {
   const extension = pi as unknown as ReasoningZipExtension;
+  const disabledSlotConflictKeys = new Set<string>();
 
   extension.registerCommand?.("reasoning-zip", {
     description: "Enable, disable, or inspect pi-reasoning-zip",
@@ -203,16 +304,31 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
   extension.on("message_end", async (event, ctx) => {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
     setFooterStatus(ctx, settings.enabled);
-    const result = await compactAssistantMessage(event.message, settings, (thinking) => compactWithOpenAI(thinking, settings));
+    const provider = messageProvider(event.message, ctx);
+    const key = conflictKey(ctx?.cwd, provider);
+    if (disabledSlotConflictKeys.has(key)) {
+      return undefined;
+    }
+    const slotPinningEnabled = await shouldPinSlots(provider, ctx, settings);
+    const effectiveSettings = withSlotPinning(settings, slotPinningEnabled);
+    const result = await compactAssistantMessage(event.message, effectiveSettings, (thinking) => compactWithOpenAI(thinking, effectiveSettings));
     notifyCompactionFailures(ctx, result.failures);
     if (result.changed) return { message: result.message };
     return undefined;
   });
 
-  extension.on("before_provider_request", (event, ctx) => {
+  extension.on("before_provider_request", async (event, ctx) => {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
     setFooterStatus(ctx, settings.enabled);
-    const nextPayload = injectReasoningZipPrompt(event.payload, eventProvider(event, ctx), settings);
+    const provider = eventProvider(event, ctx);
+    const slotPinningEnabled = await shouldPinSlots(provider, ctx, settings);
+    const effectiveSettings = withSlotPinning(settings, slotPinningEnabled);
+    const slotResult = injectLlamaCppMainSlot(event.payload, provider, effectiveSettings);
+    if (slotResult.conflict) {
+      disabledSlotConflictKeys.add(conflictKey(ctx?.cwd, provider));
+      notify(ctx, "pi-reasoning-zip llama.cpp id_slot conflict; main and compactor slots should differ; compaction is disabled for this provider until reload.", "warning");
+    }
+    const nextPayload = injectReasoningZipPrompt(slotResult.payload, provider, settings);
     return nextPayload === event.payload ? undefined : nextPayload;
   });
 }

@@ -2,7 +2,7 @@ import { buildCompactionPrompt } from "./compactPrompt.js";
 import type { ReasoningZipSettings } from "./types.js";
 
 function buildPayload(thinking: string, settings: ReasoningZipSettings, disableThinking: boolean): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     model: settings.compactor.model,
     messages: [
       { role: "system", content: "You compress reasoning traces. Output only compact trace." },
@@ -17,6 +17,19 @@ function buildPayload(thinking: string, settings: ReasoningZipSettings, disableT
         }
       : {}),
   };
+
+  if (settings.llamaCppSlots.enabled === true) {
+    // llama.cpp `--parallel N` creates N slots. Pin compaction to its own
+    // id_slot so this side request does not replace the main chat slot's KV
+    // cache and force the next user turn to re-process the full prompt.
+    if (settings.llamaCppSlots.compactorIdSlot === settings.llamaCppSlots.mainIdSlot) {
+      throw new Error("llama.cpp main and compactor id_slot must differ");
+    }
+    payload.id_slot = settings.llamaCppSlots.compactorIdSlot;
+    payload.cache_prompt = true;
+  }
+
+  return payload;
 }
 
 async function postCompactionRequest(

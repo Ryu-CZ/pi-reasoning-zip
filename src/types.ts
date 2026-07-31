@@ -2,6 +2,8 @@ export type ReasoningZipMode = "llama-only" | "local-only" | "all" | "disabled";
 export type ReasoningZipStorageMode = "compact-new" | "off";
 export type ReasoningZipCompressionRole = "balanced" | "grug" | "ultra-grug";
 
+export type ReasoningZipSlotMode = boolean | "auto";
+
 export interface ReasoningZipSettings {
   enabled: boolean;
   mode: ReasoningZipMode;
@@ -9,6 +11,11 @@ export interface ReasoningZipSettings {
   compressionRole: ReasoningZipCompressionRole;
   injectPrompt: boolean;
   footerStatus: string;
+  llamaCppSlots: {
+    enabled: ReasoningZipSlotMode;
+    mainIdSlot: number;
+    compactorIdSlot: number;
+  };
   compactor: {
     baseUrl: string;
     model: string;

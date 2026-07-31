@@ -104,7 +104,7 @@ describe("extension entrypoint", () => {
   });
 
   it("message_end returns replacement only when compaction changes message", async () => {
-    const cwd = await tempProject({ mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const cwd = await tempProject({ enabled: true, mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({ choices: [{ message: { content: "zip" } }] }),
@@ -120,7 +120,7 @@ describe("extension entrypoint", () => {
   });
 
   it("message_end warns when compaction fails and preserves the original message", async () => {
-    const cwd = await tempProject({ mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const cwd = await tempProject({ enabled: true, mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 500 } as Response);
     const handler = loadExtension().get("message_end")!;
     const notifications: Array<{ message: string; level: string | undefined }> = [];
@@ -199,19 +199,171 @@ describe("extension entrypoint", () => {
   });
 
   it("before_provider_request injects only for changed payloads", async () => {
-    const cwd = await tempProject({ mode: "llama-only" });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only" });
     const handler = loadExtension().get("before_provider_request")!;
-    const injected = handler({ provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
+    const injected = await handler({ provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
     expect(injected.messages[0].content).toContain(PROMPT_MARKER);
 
-    const skipped = handler({ provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
+    const skipped = await handler({ provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
     expect(skipped).toBeUndefined();
   });
 
-  it("before_provider_request can target the real Pi ctx.model provider shape", async () => {
-    const cwd = await tempProject({ mode: "llama-only" });
+  it("before_provider_request pins main llama.cpp requests without overriding explicit id_slot", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
     const handler = loadExtension().get("before_provider_request")!;
-    const injected = handler(
+
+    const pinned = await handler(
+      { provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+    expect(pinned.id_slot).toBe(0);
+    expect(pinned.cache_prompt).toBe(true);
+
+    const explicit = await handler(
+      { provider: "llama-server=http://127.0.0.1:7484", payload: { id_slot: 7, messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+    expect(explicit).toBeUndefined();
+  });
+
+  it("forced slot pinning does not add llama.cpp fields to non-llama providers", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "all", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 }, thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const handlers = loadExtension();
+    const provider = "openai";
+
+    const requestResult = await handlers.get("before_provider_request")!(
+      { provider, payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+    expect(requestResult).toBeUndefined();
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+    await handlers.get("message_end")!(
+      { message: { role: "assistant", provider, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.id_slot).toBeUndefined();
+    expect(body.cache_prompt).toBeUndefined();
+  });
+
+  it("before_provider_request auto-pins when the shared llama.cpp server exposes at least two slots", async () => {
+    const cwd = await tempProject({
+      enabled: true,
+      mode: "llama-only",
+      injectPrompt: false,
+      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
+      thresholds: { minChars: 5, maxTraceChars: 100 },
+    });
+    const handlers = loadExtension();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
+
+    const pinned = await handlers.get("before_provider_request")!(
+      { provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+    expect(pinned.id_slot).toBe(0);
+
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7484", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+    expect(result.message.content[0].thinking).toBe("zip");
+    const compactorBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body));
+    expect(compactorBody.id_slot).toBe(1);
+  });
+
+  it("before_provider_request auto-pins custom OpenAI-compatible llama.cpp models when /slots works", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "all", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7487/v1" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
+    const handler = loadExtension().get("before_provider_request")!;
+
+    const result = await handler(
+      { provider: "custom-local", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd, model: { provider: "custom-local", baseUrl: "http://127.0.0.1:7487/v1" } },
+    );
+
+    expect(result.id_slot).toBe(0);
+  });
+
+  it("before_provider_request does not auto-pin same-origin but different-path llama.cpp servers", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7488/zip/v1" } });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const handler = loadExtension().get("before_provider_request")!;
+
+    const result = await handler(
+      { provider: "llama-server=http://127.0.0.1:7488/main/v1", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("before_provider_request reuses the auto slot probe result", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7486/v1" } });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
+    const handler = loadExtension().get("before_provider_request")!;
+    const event = { provider: "llama-server=http://127.0.0.1:7486", payload: { messages: [{ role: "system", content: "sys" }] } };
+
+    await handler(event, { cwd });
+    await handler(event, { cwd });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("before_provider_request does not auto-pin when the shared llama.cpp server has fewer than two slots", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7485/v1" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }] } as Response);
+    const handler = loadExtension().get("before_provider_request")!;
+
+    const result = await handler(
+      { provider: "llama-server=http://127.0.0.1:7485", payload: { messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("before_provider_request warns when an explicit main id_slot conflicts with compactor id_slot", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
+    const handlers = loadExtension();
+    const handler = handlers.get("before_provider_request")!;
+    const notifications: Array<{ message: string; level: string | undefined }> = [];
+
+    const result = await handler(
+      { provider: "llama-server=http://127.0.0.1:7484", payload: { id_slot: 1, messages: [{ role: "system", content: "sys" }] } },
+      { cwd, ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) } },
+    );
+
+    expect(result).toBeUndefined();
+    expect(notifications).toEqual([
+      { message: "pi-reasoning-zip llama.cpp id_slot conflict; main and compactor slots should differ; compaction is disabled for this provider until reload.", level: "warning" },
+    ]);
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+    const messageEnd = handlers.get("message_end")!;
+    const messageEndResult = await messageEnd(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7484", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+    expect(messageEndResult).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("before_provider_request can target the real Pi ctx.model provider shape", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only" });
+    const handler = loadExtension().get("before_provider_request")!;
+    const injected = await handler(
       { type: "before_provider_request", payload: { messages: [{ role: "system", content: "sys" }] } },
       { cwd, model: { provider: "llama-server=http://127.0.0.1:7484" } },
     );
@@ -223,7 +375,7 @@ describe("extension entrypoint", () => {
     await writeGlobalSettings(cwd, { mode: "all" });
     const handler = loadExtension().get("before_provider_request")!;
 
-    const injected = handler(
+    const injected = await handler(
       { provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } },
       { cwd },
     );
