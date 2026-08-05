@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
     baseUrl: "http://127.0.0.1:7484/v1",
     model: "unsloth",
     apiKey: "sk-placeholder",
-    maxCompactionRatio: 0.25,
+    maxCompactionRatio: 0.75,
     temperature: 0.1,
     timeoutMs: 30000,
   },

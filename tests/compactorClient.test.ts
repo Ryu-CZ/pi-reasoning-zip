@@ -28,7 +28,7 @@ describe("compactWithOpenAI", () => {
     expect(body.messages[0].content).toBe("You compress reasoning traces. Output only compact trace.");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(body.thinking_budget_tokens).toBe(0);
-    expect(body.max_tokens).toBe(2);
+    expect(body.max_tokens).toBe(4);
   });
 
   it("sizes the output budget from the estimated input tokens", async () => {

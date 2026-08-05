@@ -6,7 +6,7 @@ describe("resolveReasoningZipSettings", () => {
     const settings = resolveReasoningZipSettings(undefined);
     expect(settings.mode).toBe("local-only");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
-    expect(settings.compactor.maxCompactionRatio).toBe(0.25);
+    expect(settings.compactor.maxCompactionRatio).toBe(0.75);
     expect(settings.llamaCppSlots).toEqual({ enabled: false, mainIdSlot: 0, compactorIdSlot: 1 });
     expect(settings.thresholds.maxInputChars).toBe(50000);
     expect(settings.footerStatus).toBe("🗜️ Zip");
@@ -39,8 +39,8 @@ describe("resolveReasoningZipSettings", () => {
   it("accepts a maximum compaction ratio and falls back for invalid fractions", () => {
     expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0.5 } }).compactor.maxCompactionRatio).toBe(0.5);
 
-    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(0.25);
-    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(0.25);
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(0.75);
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(0.75);
   });
 
   it("ignores removed development settings", () => {

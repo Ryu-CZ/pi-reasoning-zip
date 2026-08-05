@@ -17,7 +17,7 @@ The extension rereads settings for every relevant hook. Global values are merged
 | `compactor.baseUrl` | string | `http://127.0.0.1:7484/v1` | OpenAI-compatible API base URL; trailing slashes are removed. |
 | `compactor.model` | string | `unsloth` | Model sent in compactor requests. |
 | `compactor.apiKey` | string | `sk-placeholder` | Bearer token for compactor requests and `/slots` probes. |
-| `compactor.maxCompactionRatio` | fraction greater than 0 and at most 1 | `0.25` | Sets the maximum per-input output budget using estimated input tokens. |
+| `compactor.maxCompactionRatio` | fraction greater than 0 and at most 1 | `0.75` | Sets the maximum per-input output budget using estimated input tokens. |
 | `compactor.temperature` | non-negative number | `0.1` | Compactor sampling temperature. |
 | `compactor.timeoutMs` | number, at least 1 | `30000` | Compactor request timeout in milliseconds. |
 | `thresholds.minChars` | non-negative number | `1000` | Minimum reasoning-block length eligible for compaction. |
@@ -45,7 +45,7 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
       "baseUrl": "http://127.0.0.1:8080/v1",
       "model": "Qwen3.6-27B",
       "apiKey": "sk-placeholder",
-      "maxCompactionRatio": 0.25,
+      "maxCompactionRatio": 0.75,
       "temperature": 0.1,
       "timeoutMs": 30000
     },
@@ -138,7 +138,7 @@ estimatedInputTokens = ceil(C / 4)
 max_tokens = ceil(estimatedInputTokens * maxCompactionRatio)
 ```
 
-At the default `0.25`, an 8,000-character trace is estimated as 2,000 input tokens and receives `max_tokens: 500`. The `C / 4` conversion is approximate, especially for code and non-English text. This field limits generation; it does not promise the result will be that ratio, and the result must still be shorter than the source and no longer than `thresholds.maxTraceChars`. A response stopped by the token limit is rejected as truncated, preserving the original.
+At the default `0.75`, an 8,000-character trace is estimated as 2,000 input tokens and receives `max_tokens: 1500`. The `C / 4` conversion is approximate, especially for code and non-English text. This field limits generation; it does not promise the result will be that ratio, and the result must still be shorter than the source and no longer than `thresholds.maxTraceChars`. A response stopped by the token limit is rejected as truncated, preserving the original. The default deliberately leaves generation headroom: the local benchmark found that `0.25` and `0.5` truncated every tested lossless-ledger response.
 
 ### `compactor.temperature`
 

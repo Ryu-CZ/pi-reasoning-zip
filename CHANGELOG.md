@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replaced the fixed compactor token limit with `compactor.maxCompactionRatio`, which derives an output budget separately for each reasoning input.
+- Set the ratio default to `0.75` after a fresh five-task benchmark found that `0.25` through `0.5` truncated every lossless-ledger response; completed output must still pass the shorter-than-source acceptance check.
 - Expanded the configuration reference with the purpose, exact behavior, accepted values, interactions, and failure semantics of every supported setting.
-- Replaced the README's 2026-07-09 local benchmark with an isolated five-task Pi `0.83.0` benchmark (`thresholds.minChars: 400`) covering exact-trace compression, retention, slot isolation, multi-turn KV-cache reuse, and estimated long-session savings.
+- Replaced the outdated local results with a fresh isolated Pi `0.83.0` five-task benchmark covering ratio calibration, exact-source compression, retention, timing, fail-open behavior, and live slot routing.
 - Split the README into a quick start with the full reference in `docs/` (`benchmark.md`, `configuration.md`, `llama-cpp-slot-pinning.md`) and added `CONTRIBUTING.md`.
 - Compact eligible thinking in tool-call messages while preserving tool-call blocks unchanged.
 - Reworked the compactor prompt into a lossless state ledger (typed `F/C/D/X/U/R/O/N` buckets) that copies exact values, keeps causal order and complete dead-end rationale, and never emits its own instruction text; its `none` escape hatch now fires only when no useful state remains.

@@ -40,18 +40,18 @@ It is usually not useful for hosted closed models that expose only opaque or alr
 
 ## Results
 
-A controlled five-task local benchmark sent each exact source trace to the same compactor. This isolates storage reduction from independent generation variance.
+A fresh controlled five-task local benchmark used `Qwen3.6-27B-UD-Q4_K_XL.gguf` and sent each exact source trace to the current lossless-ledger prompt. This isolates storage reduction from independent generation variance.
 
-| Task | Original thinking | Compact thinking | Change | Retention result |
+| Task | Original thinking | Stored thinking | Change | Result |
 |---|---:|---:|---:|---|
-| Incident rollback plan | 1,261 chars | 378 chars | -70.0% | All supplied facts, thresholds, path, command, and migration constraint retained |
-| Double-charge debugging | 3,934 chars | 830 chars | -78.9% | Claim/retry design and failed approaches retained; some API-idempotency nuance condensed |
-| Sliding-window algorithm | 2,079 chars | 560 chars | -73.1% | Algorithm, inclusive boundary, correctness argument, and complexity retained |
-| Redis-to-PostgreSQL migration | 467 chars | 349 chars | -25.3% | All explicit migration constraints retained |
-| Inference-service decision | 599 chars | 474 chars | -20.9% | Hard constraints and option data retained; workload and TTFT details were omitted |
-| **Total** | **8,340 chars** | **2,591 chars** | **-68.9%** | Core continuation state retained, with greater detail loss in the shortest trace |
+| Incident rollback plan | 1,504 chars | 838 chars | -44.3% | Exact facts, command, constraints, uncertainty, and next action retained |
+| Double-charge debugging | 5,001 chars | 5,001 chars | 0% | Complete output exceeded `maxTraceChars`; original preserved |
+| Sliding-window algorithm | 2,002 chars | 984 chars | -50.8% | Algorithm, constraints, proof state, and incorrect approaches retained |
+| Redis-to-PostgreSQL migration | 191 chars | 191 chars | 0% | Below the minimum input threshold; no request made |
+| Inference-service decision | 3,293 chars | 1,162 chars | -64.7% | Constraints, values, decision, uncertainties, and TTFT risk retained |
+| **Total** | **11,991 chars** | **8,176 chars** | **-31.8%** | Three traces compacted; two safely preserved |
 
-These are measured local storage results, not universal compression rates. The estimated 30–60 seconds to rebuild a lost 60k-token prompt is an extrapolation, not a measured long-context result. See [Benchmark](docs/benchmark.md) for the environment, methodology, slot verification, all observations, and limitations.
+Ratios from `0.25` through `0.5` truncated every eligible response. `0.75` completed all four eligible responses and is now the built-in default; one complete result was still rejected by the independent 2,000-character storage bound. Substituting accepted traces into the exact baseline JSONL files reduced complete one-turn session storage from 53,991 to 50,082 bytes (-7.2%). These are measured local results, not universal compression rates. See [Benchmark](docs/benchmark.md) for methodology, calibration, whole-session results, retention review, timing, slot verification, and limitations.
 
 ## Install
 
