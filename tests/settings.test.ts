@@ -8,6 +8,7 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.storageMode).toBe("compact-new");
     expect(settings.compressionRole).toBe("grug");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
+    expect(settings.compactor.maxCompactionRatio).toBe(0.25);
     expect(settings.llamaCppSlots).toEqual({ enabled: false, mainIdSlot: 0, compactorIdSlot: 1 });
     expect(settings.thresholds.maxInputChars).toBe(50000);
     expect(settings.footerStatus).toBe("🗜️ Zip");
@@ -38,5 +39,12 @@ describe("resolveReasoningZipSettings", () => {
   it("removes all trailing slashes from the compactor base URL", () => {
     const settings = resolveReasoningZipSettings({ compactor: { baseUrl: "http://local.test/v1///" } });
     expect(settings.compactor.baseUrl).toBe("http://local.test/v1");
+  });
+
+  it("accepts a maximum compaction ratio and falls back for invalid fractions", () => {
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0.5 } }).compactor.maxCompactionRatio).toBe(0.5);
+
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(0.25);
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(0.25);
   });
 });

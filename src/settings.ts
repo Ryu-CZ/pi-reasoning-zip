@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
     baseUrl: "http://127.0.0.1:7484/v1",
     model: "unsloth",
     apiKey: "sk-placeholder",
-    maxTokens: 512,
+    maxCompactionRatio: 0.25,
     temperature: 0.1,
     timeoutMs: 30000,
   },
@@ -69,6 +69,10 @@ function slotModeValue(value: unknown, fallback: ReasoningZipSlotMode): Reasonin
 
 function numberValue(value: unknown, fallback: number, min = 0): number {
   return typeof value === "number" && Number.isFinite(value) && value >= min ? value : fallback;
+}
+
+function optionalFraction(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 1 ? value : undefined;
 }
 
 function integerValue(value: unknown, fallback: number, min = 0): number {
@@ -155,7 +159,7 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
       baseUrl: stringValue(compactor.baseUrl, DEFAULT_SETTINGS.compactor.baseUrl).replace(/\/+$/, ""),
       model: stringValue(compactor.model, DEFAULT_SETTINGS.compactor.model),
       apiKey: stringValue(compactor.apiKey, DEFAULT_SETTINGS.compactor.apiKey),
-      maxTokens: numberValue(compactor.maxTokens, DEFAULT_SETTINGS.compactor.maxTokens, 1),
+      maxCompactionRatio: optionalFraction(compactor.maxCompactionRatio) ?? DEFAULT_SETTINGS.compactor.maxCompactionRatio,
       temperature: numberValue(compactor.temperature, DEFAULT_SETTINGS.compactor.temperature, 0),
       timeoutMs: numberValue(compactor.timeoutMs, DEFAULT_SETTINGS.compactor.timeoutMs, 1),
     },

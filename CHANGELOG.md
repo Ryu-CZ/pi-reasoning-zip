@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replaced the fixed compactor token limit with `compactor.maxCompactionRatio`, which derives an output budget separately for each reasoning input.
 - Replaced the README's 2026-07-09 local benchmark with an isolated five-task Pi `0.83.0` benchmark (`thresholds.minChars: 400`) covering exact-trace compression, retention, slot isolation, multi-turn KV-cache reuse, and estimated long-session savings.
 - Split the README into a quick start with the full reference in `docs/` (`benchmark.md`, `configuration.md`, `llama-cpp-slot-pinning.md`) and added `CONTRIBUTING.md`.
 - Compact eligible thinking in tool-call messages while preserving tool-call blocks unchanged.

@@ -17,7 +17,7 @@ Settings live under `reasoningZip` in project `.pi/settings.json` or global `~/.
 | `compactor.baseUrl` | string | `http://127.0.0.1:7484/v1` | OpenAI-compatible API base URL; trailing slashes are removed. |
 | `compactor.model` | string | `unsloth` | Model sent in compactor requests. |
 | `compactor.apiKey` | string | `sk-placeholder` | Bearer token for compactor requests and `/slots` probes. |
-| `compactor.maxTokens` | number, at least 1 | `512` | Maximum compactor output tokens. |
+| `compactor.maxCompactionRatio` | fraction greater than 0 and at most 1 | `0.25` | Sets the maximum per-input output budget using estimated input tokens. |
 | `compactor.temperature` | non-negative number | `0.1` | Compactor sampling temperature. |
 | `compactor.timeoutMs` | number, at least 1 | `30000` | Compactor request timeout in milliseconds. |
 | `thresholds.minChars` | non-negative number | `1000` | Minimum reasoning-block length eligible for compaction. |
@@ -47,7 +47,7 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
       "baseUrl": "http://127.0.0.1:8080/v1",
       "model": "Qwen3.6-27B",
       "apiKey": "sk-placeholder",
-      "maxTokens": 512,
+      "maxCompactionRatio": 0.25,
       "temperature": 0.1,
       "timeoutMs": 30000
     },
@@ -117,9 +117,11 @@ The prompt treats dead ends as durable state: a rejected option is not reduced t
 
 The extension preserves the original reasoning if the request fails or the response is empty, `none`, contains inline reasoning wrappers, is truncated, is not shorter than the original, or exceeds `thresholds.maxTraceChars`.
 
+Each request uses `ceil(ceil(input characters / 4) * maxCompactionRatio)` as its output token budget. The character-to-token estimate is approximate, especially for code and non-English text.
+
 ## Thresholds
 
-`minChars` avoids spending a compactor request on short reasoning blocks. `maxInputChars` bounds compactor input. `maxTraceChars` bounds accepted output independently of `compactor.maxTokens`.
+`minChars` avoids spending a compactor request on short reasoning blocks. `maxInputChars` bounds compactor input. `maxTraceChars` bounds accepted output independently of the ratio-based token budget.
 
 The benchmark used `minChars: 400` to test aggressive coverage; that is not the built-in default. It compacted short traces but required two extra requests to save 243 characters across the two shortest tasks, and one result lost secondary context. See [Benchmark](benchmark.md).
 

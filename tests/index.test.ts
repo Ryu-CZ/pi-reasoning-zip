@@ -145,7 +145,7 @@ describe("extension entrypoint", () => {
   it("message_end recursively inherits global compactor and threshold settings", async () => {
     const cwd = await tempProject({ mode: "all", thresholds: { minChars: 5 } });
     await writeGlobalSettings(cwd, {
-      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxTokens: 77 },
+      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxCompactionRatio: 0.5 },
       thresholds: { minChars: 1000, maxTraceChars: 2 },
     });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -164,7 +164,7 @@ describe("extension entrypoint", () => {
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(String(request.body)) as { model: string; max_tokens: number };
     expect(body.model).toBe("global-model");
-    expect(body.max_tokens).toBe(77);
+    expect(body.max_tokens).toBe(4);
   });
 
   it("message_end applies nested project overrides while inheriting sibling global settings", async () => {
@@ -174,7 +174,7 @@ describe("extension entrypoint", () => {
       thresholds: { maxTraceChars: 12 },
     });
     await writeGlobalSettings(cwd, {
-      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxTokens: 77 },
+      compactor: { baseUrl: "http://global.test/v1", model: "global-model", maxCompactionRatio: 0.5 },
       thresholds: { minChars: 5, maxTraceChars: 5 },
     });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -193,7 +193,7 @@ describe("extension entrypoint", () => {
     const body = JSON.parse(String((init as RequestInit).body)) as { model: string; max_tokens: number };
     expect(url).toBe("http://global.test/v1/chat/completions");
     expect(body.model).toBe("project-model");
-    expect(body.max_tokens).toBe(77);
+    expect(body.max_tokens).toBe(4);
   });
 
   it("message_end returns undefined when unchanged", async () => {

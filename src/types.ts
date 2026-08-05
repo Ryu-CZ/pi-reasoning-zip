@@ -29,7 +29,7 @@ export interface ReasoningZipSettings {
     baseUrl: string;
     model: string;
     apiKey: string;
-    maxTokens: number;
+    maxCompactionRatio: number;
     temperature: number;
     timeoutMs: number;
   };

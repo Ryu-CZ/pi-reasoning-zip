@@ -26,6 +26,22 @@ describe("compactWithOpenAI", () => {
     expect(body.messages[0].content).toBe("You compress reasoning traces. Output only compact trace.");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(body.thinking_budget_tokens).toBe(0);
+    expect(body.max_tokens).toBe(2);
+  });
+
+  it("sizes the output budget from the estimated input tokens", async () => {
+    const dynamicSettings = resolveReasoningZipSettings({
+      compactor: { baseUrl: "http://local.test/v1", maxCompactionRatio: 0.25 },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+
+    await compactWithOpenAI("x".repeat(8000), dynamicSettings);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.max_tokens).toBe(500);
   });
 
   it("passes configured compression role into the compaction prompt", async () => {

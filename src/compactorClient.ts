@@ -1,6 +1,11 @@
 import { buildCompactionPrompt } from "./compactPrompt.js";
 import type { ReasoningZipSettings } from "./types.js";
 
+function outputTokenBudget(thinking: string, settings: ReasoningZipSettings): number {
+  const estimatedInputTokens = Math.ceil(thinking.length / 4);
+  return Math.ceil(estimatedInputTokens * settings.compactor.maxCompactionRatio);
+}
+
 function buildPayload(thinking: string, settings: ReasoningZipSettings, disableThinking: boolean): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     model: settings.compactor.model,
@@ -8,7 +13,7 @@ function buildPayload(thinking: string, settings: ReasoningZipSettings, disableT
       { role: "system", content: "You compress reasoning traces. Output only compact trace." },
       { role: "user", content: buildCompactionPrompt(thinking, settings.compressionRole) },
     ],
-    max_tokens: settings.compactor.maxTokens,
+    max_tokens: outputTokenBudget(thinking, settings),
     temperature: settings.compactor.temperature,
     ...(disableThinking
       ? {

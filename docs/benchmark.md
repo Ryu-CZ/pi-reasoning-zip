@@ -28,7 +28,6 @@ Test settings were:
 {
   "compressionRole": "grug",
   "compactor": {
-    "maxTokens": 512,
     "temperature": 0.1
   },
   "thresholds": {
@@ -38,6 +37,8 @@ Test settings were:
   }
 }
 ```
+
+This benchmark predates ratio-based budgeting and used the former fixed 512-token request cap, which is no longer configurable.
 
 Independent local generations produced different reasoning lengths. Direct enabled/disabled totals would therefore combine sampling variance with compression. The controlled storage and retention comparison sent each exact baseline trace to the same configured compactor.
 
