@@ -1,13 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import type { ReasoningZipCompressionRole, ReasoningZipMode, ReasoningZipSettings, ReasoningZipSlotMode, ReasoningZipStorageMode } from "./types.js";
+import type { ReasoningZipMode, ReasoningZipSettings, ReasoningZipSlotMode } from "./types.js";
 
 export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   enabled: true,
   mode: "local-only",
-  storageMode: "compact-new",
-  compressionRole: "grug",
   footerStatus: "🗜️ Zip",
   llamaCppSlots: {
     enabled: false,
@@ -29,9 +27,7 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   },
 };
 
-const modes = new Set<ReasoningZipMode>(["llama-only", "local-only", "all", "disabled"]);
-const storageModes = new Set<ReasoningZipStorageMode>(["compact-new", "off"]);
-const compressionRoles = new Set<ReasoningZipCompressionRole>(["balanced", "grug", "ultra-grug"]);
+const modes = new Set<ReasoningZipMode>(["llama-only", "local-only", "all"]);
 
 export type SettingsScope = "global" | "project";
 
@@ -137,18 +133,9 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
   const llamaCppSlots = asObject(root.llamaCppSlots);
 
   const mode = modes.has(root.mode as ReasoningZipMode) ? (root.mode as ReasoningZipMode) : DEFAULT_SETTINGS.mode;
-  const storageMode = storageModes.has(root.storageMode as ReasoningZipStorageMode)
-    ? (root.storageMode as ReasoningZipStorageMode)
-    : DEFAULT_SETTINGS.storageMode;
-  const compressionRole = compressionRoles.has(root.compressionRole as ReasoningZipCompressionRole)
-    ? (root.compressionRole as ReasoningZipCompressionRole)
-    : DEFAULT_SETTINGS.compressionRole;
-
   return {
     enabled: booleanValue(root.enabled, DEFAULT_SETTINGS.enabled),
     mode,
-    storageMode,
-    compressionRole,
     footerStatus: stringValue(root.footerStatus, DEFAULT_SETTINGS.footerStatus),
     llamaCppSlots: {
       enabled: slotModeValue(llamaCppSlots.enabled, DEFAULT_SETTINGS.llamaCppSlots.enabled),

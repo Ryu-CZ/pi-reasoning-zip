@@ -1,6 +1,8 @@
 # Configuration
 
-Settings live under `reasoningZip` in project `.pi/settings.json` or global `~/.pi/agent/settings.json`. Project values override global values recursively. `footerStatus` is the exception: the extension reads it only from global settings.
+Settings live under the `reasoningZip` object in project `.pi/settings.json` or global `~/.pi/agent/settings.json`. If `PI_CODING_AGENT_DIR` is set, its `settings.json` replaces `~/.pi/agent/settings.json` as the global file.
+
+The extension rereads settings for every relevant hook. Global values are merged recursively with project values, so a project can override one nested field without repeating its siblings. `footerStatus` is the exception: it is read only from the global file so one project cannot change the shared Pi footer. A missing or unreadable settings section behaves like an empty section. Invalid values fall back to the built-in value; an invalid project value does not reveal an overridden global value.
 
 ## Complete reference
 
@@ -8,8 +10,6 @@ Settings live under `reasoningZip` in project `.pi/settings.json` or global `~/.
 |---|---|---|---|
 | `enabled` | boolean | `true` | Enables compaction. |
 | `mode` | string | `local-only` | Selects providers eligible for extension behavior. |
-| `storageMode` | string | `compact-new` | Controls whether new assistant reasoning is compacted before storage. |
-| `compressionRole` | string | `grug` | Selects the compactor's requested output style. |
 | `footerStatus` | string | `🗜️ Zip` | Text shown in Pi's footer while enabled; read from global settings only. |
 | `llamaCppSlots.enabled` | boolean or `"auto"` | `false` | Controls opt-in llama.cpp slot pinning. |
 | `llamaCppSlots.mainIdSlot` | non-negative integer | `0` | Slot ID for targeted main Pi requests. |
@@ -35,8 +35,6 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
   "reasoningZip": {
     "enabled": true,
     "mode": "local-only",
-    "storageMode": "compact-new",
-    "compressionRole": "grug",
     "footerStatus": "🗜️ Zip",
     "llamaCppSlots": {
       "enabled": "auto",
@@ -60,35 +58,117 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
 }
 ```
 
-## Modes
+## Field details
 
-| Mode | Behavior |
+### `enabled`
+
+Master on/off switch for the extension. It exists so `/reasoning-zip enable`, `disable`, and `toggle` can change behavior without destroying the rest of the configuration.
+
+- `true`: allow targeting, compaction, and optional slot handling according to the other fields; show `footerStatus`.
+- `false`: do not target or compact messages and do not inject slot fields; clear the footer status.
+
+This is the only on/off control. The older `mode: "disabled"` and `storageMode: "off"` controls were removed because they produced the same result.
+
+### `mode`
+
+Limits which providers the extension may touch. This exists to avoid sending private reasoning from an unintended provider to the configured compactor.
+
+| Value | Exact targeting behavior |
 |---|---|
-| `llama-only` | Target llama.cpp-like providers only. |
-| `local-only` | Target local URL providers and local `llama-server=` endpoints only. |
-| `all` | Target any eligible plain Pi thinking block. |
-| `disabled` | Disable compaction. |
+| `local-only` | Accept provider IDs that are local URLs using `localhost`, `127.0.0.1`, `::1`, or `0.0.0.0`, including a local URL after the `llama-server=` prefix. This is the default. |
+| `llama-only` | Accept provider IDs beginning with `llama-server=` or containing `llama.cpp`/`llamacpp`, regardless of whether their URL is local. |
+| `all` | Accept any provider, including hosted providers. Use only when intentionally allowing their plain thinking blocks to be sent to `compactor.baseUrl`. |
 
-Unknown providers are skipped in `llama-only`; hosted or non-local providers are skipped in `local-only`.
+An absent or unrecognized provider is skipped by `local-only` and `llama-only`, but accepted by `all`. Every mode still requires an assistant message, an eligible plain thinking block, and passing thresholds. Compaction is always forward-only: it never rewrites earlier session entries, backfills the current session, or modifies replayed context.
 
-## Storage modes
+### `footerStatus`
 
-| Storage mode | Behavior |
+Text shown through Pi's footer status API while the extension is enabled. It exists as a small visual reminder that future eligible reasoning will be compacted.
+
+Only the global value is used; a project `footerStatus` is deliberately ignored. The value must be a non-empty string. Disabling the extension or ending the session clears the status.
+
+### `llamaCppSlots.enabled`
+
+Controls whether main Pi requests and compactor requests are assigned separate llama.cpp `id_slot` values. It exists because an unpinned compactor request on a shared server can replace the main conversation's reusable KV cache.
+
+| Value | Behavior and responsibility |
 |---|---|
-| `compact-new` | Compact eligible new assistant thinking before Pi stores it. |
-| `off` | Do not alter assistant messages. |
+| `false` | Do not add slot fields or probe `/slots`. Default and most compatible, but offers no cache isolation on a shared server. |
+| `"auto"` | For a shared eligible endpoint, authenticate to `GET /slots`, verify at least two slots and non-colliding IDs, then pin both requests. Unsafe or ambiguous shared-server state skips compaction and preserves the original reasoning. Different known endpoints compact without pinning. |
+| `true` | Force slot pinning without probing. Use only when the server supports llama.cpp slot fields and you manage its topology. |
 
-Storage is forward-only. No mode rewrites previous sessions, backfills the current session, or mutates replayed context through Pi's `context` hook.
+Auto mode's request-bound checks also fail closed if settings change mid-generation, request correlation is missing or ambiguous, or an existing explicit main slot conflicts. See [llama.cpp slot pinning](llama-cpp-slot-pinning.md).
 
-## Compression roles
+### `llamaCppSlots.mainIdSlot`
 
-| Role | Behavior |
-|---|---|
-| `balanced` | Request concise bullets while preserving additional context. |
-| `grug` | Request terse, keyword-heavy output. This is the default. |
-| `ultra-grug` | Request the most aggressive fragment-style trace. |
+Non-negative integer sent as `id_slot` on a targeted main Pi request when pinning is active. It exists to keep the growing conversation in a stable slot. The extension also adds `cache_prompt: true` unless the request already set it, but never overwrites an existing `id_slot`.
 
-The compactor is asked to retain facts, decisions, constraints, failed approaches, and next actions. The role changes that requested style; acceptance checks remain the same.
+llama.cpp wraps IDs modulo the actual slot count, so numerically different IDs can still collide. Auto mode checks the normalized value; forced mode can only check direct equality and leaves topology correctness to you.
+
+### `llamaCppSlots.compactorIdSlot`
+
+Non-negative integer sent as `id_slot` on the separate compactor request when pinning is active. It exists to prevent that short request from occupying the main conversation's slot. Compactor requests also set `cache_prompt: true`.
+
+It must resolve to a different actual slot than `mainIdSlot` and any explicit main-request `id_slot`. A direct conflict throws before the compactor request in forced mode; auto mode detects modulo collisions and preserves the original reasoning.
+
+### `compactor.baseUrl`
+
+Base URL of the OpenAI-compatible server that performs compaction. The extension sends `POST {baseUrl}/chat/completions`; trailing slashes are removed when settings are resolved.
+
+This field exists so compaction can use a small or local model independently of the main Pi model. It also participates in shared-server detection for llama.cpp slot isolation: URLs are compared after removing a trailing `/v1`. Use the API root ending in `/v1`, not the full `/chat/completions` path.
+
+### `compactor.model`
+
+Model identifier placed in the compactor request body. It exists because OpenAI-compatible servers route requests by their configured model name or alias. The extension does not discover models or verify this name in advance; an unknown name becomes an endpoint error and the original reasoning is preserved.
+
+### `compactor.apiKey`
+
+Bearer token sent in the `Authorization` header for compactor requests. Auto slot mode also uses the same token for `GET /slots` probes.
+
+The placeholder default is suitable only for local servers that ignore authentication or accept that token. Set the real credential when the endpoint requires one, keep settings files private, and remember that project settings may override the global token.
+
+### `compactor.maxCompactionRatio`
+
+Maximum generated-output budget as a fraction of the estimated source reasoning tokens. It exists to scale the compactor budget with each input instead of using one fixed token cap for short and long traces.
+
+The accepted range is greater than `0` and at most `1`. For a thinking block whose JavaScript string `.length` is `C`, the request uses:
+
+```text
+estimatedInputTokens = ceil(C / 4)
+max_tokens = ceil(estimatedInputTokens * maxCompactionRatio)
+```
+
+At the default `0.25`, an 8,000-character trace is estimated as 2,000 input tokens and receives `max_tokens: 500`. The `C / 4` conversion is approximate, especially for code and non-English text. This field limits generation; it does not promise the result will be that ratio, and the result must still be shorter than the source and no longer than `thresholds.maxTraceChars`. A response stopped by the token limit is rejected as truncated, preserving the original.
+
+### `compactor.temperature`
+
+Non-negative sampling temperature sent directly to the compactor endpoint. It exists to control output variability. Lower values generally make ledger formatting and retention more repeatable; higher values permit more variation and can make exact-format compliance less predictable.
+
+The extension does not impose an upper limit because OpenAI-compatible endpoints differ. A value accepted by settings can still be rejected by the server, in which case compaction fails open and preserves the original reasoning.
+
+### `compactor.timeoutMs`
+
+Maximum time in milliseconds allowed for the compactor operation. It exists so a side request cannot delay completion indefinitely. The default is 30 seconds.
+
+The timer covers the initial request and the compatibility retry together. On timeout the request is aborted, the original reasoning is preserved, and Pi shows a warning. Very low values can fail healthy local models during prompt evaluation.
+
+### `thresholds.minChars`
+
+Minimum source thinking-block length, measured by JavaScript string `.length` (UTF-16 code units), eligible for a compactor request. It exists to avoid spending latency and compute on short traces where the savings are small and secondary-detail loss is more likely.
+
+The comparison is inclusive: a block exactly `minChars` long is eligible. `0` permits empty-length candidates in principle, although empty or non-useful compactions still fail validation. This threshold is evaluated independently for every thinking block in a message.
+
+### `thresholds.maxInputChars`
+
+Maximum source thinking-block length, measured by JavaScript string `.length` (UTF-16 code units), that may be sent to the compactor. It exists to bound request size, latency, and compactor context consumption. The comparison is inclusive.
+
+A longer block is skipped and retained unchanged; it is not truncated. Set this high enough for expected reasoning traces but within the compactor model's practical context window, including the compaction instructions.
+
+### `thresholds.maxTraceChars`
+
+Maximum accepted compacted output length, measured by JavaScript string `.length` (UTF-16 code units). It exists as a storage-size safety bound independent of the request's token budget.
+
+An output exceeding this value is rejected and the original reasoning remains. The output must also be non-empty, not exactly `none`, and strictly shorter than its source. This is an acceptance check after generation, not an instruction to the model and not a token limit; choose a value consistent with `maxCompactionRatio` and the content's character-to-token density.
 
 ## Compactor endpoint
 
@@ -117,14 +197,8 @@ The prompt treats dead ends as durable state: a rejected option is not reduced t
 
 The extension preserves the original reasoning if the request fails or the response is empty, `none`, contains inline reasoning wrappers, is truncated, is not shorter than the original, or exceeds `thresholds.maxTraceChars`.
 
-Each request uses `ceil(ceil(input characters / 4) * maxCompactionRatio)` as its output token budget. The character-to-token estimate is approximate, especially for code and non-English text.
-
-## Thresholds
-
-`minChars` avoids spending a compactor request on short reasoning blocks. `maxInputChars` bounds compactor input. `maxTraceChars` bounds accepted output independently of the ratio-based token budget.
+## Tuning guidance
 
 The benchmark used `minChars: 400` to test aggressive coverage; that is not the built-in default. It compacted short traces but required two extra requests to save 243 characters across the two shortest tasks, and one result lost secondary context. See [Benchmark](benchmark.md).
 
-## Slot settings
-
-Slot pinning is disabled by default. Use `"auto"` for a shared llama.cpp endpoint when `/slots` is available; use `true` only with a topology you manage. See [llama.cpp slot pinning](llama-cpp-slot-pinning.md).
+Tune `minChars` first to decide which traces are worth compacting. Then choose `maxCompactionRatio` for generation headroom and `maxTraceChars` for the largest result you are willing to store. Keep `maxInputChars` within the compactor model's context capacity. Measure retention on exact source traces: independent live generations vary and are not a controlled compression comparison.

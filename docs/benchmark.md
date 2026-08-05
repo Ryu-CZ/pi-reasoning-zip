@@ -26,7 +26,6 @@ Test settings were:
 
 ```json
 {
-  "compressionRole": "grug",
   "compactor": {
     "temperature": 0.1
   },

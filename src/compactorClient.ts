@@ -11,7 +11,7 @@ function buildPayload(thinking: string, settings: ReasoningZipSettings, disableT
     model: settings.compactor.model,
     messages: [
       { role: "system", content: "You compress reasoning traces. Output only compact trace." },
-      { role: "user", content: buildCompactionPrompt(thinking, settings.compressionRole) },
+      { role: "user", content: buildCompactionPrompt(thinking) },
     ],
     max_tokens: outputTokenBudget(thinking, settings),
     temperature: settings.compactor.temperature,

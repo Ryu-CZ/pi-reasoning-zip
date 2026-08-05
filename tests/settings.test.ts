@@ -5,8 +5,6 @@ describe("resolveReasoningZipSettings", () => {
   it("returns defaults for empty config", () => {
     const settings = resolveReasoningZipSettings(undefined);
     expect(settings.mode).toBe("local-only");
-    expect(settings.storageMode).toBe("compact-new");
-    expect(settings.compressionRole).toBe("grug");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
     expect(settings.compactor.maxCompactionRatio).toBe(0.25);
     expect(settings.llamaCppSlots).toEqual({ enabled: false, mainIdSlot: 0, compactorIdSlot: 1 });
@@ -15,9 +13,8 @@ describe("resolveReasoningZipSettings", () => {
   });
 
   it("merges partial config", () => {
-    const settings = resolveReasoningZipSettings({ mode: "all", compressionRole: "ultra-grug", footerStatus: "Zip On", llamaCppSlots: { enabled: true, mainIdSlot: 2, compactorIdSlot: 3 }, compactor: { model: "zipper" }, thresholds: { minChars: 10, maxInputChars: 20000 } });
+    const settings = resolveReasoningZipSettings({ mode: "all", footerStatus: "Zip On", llamaCppSlots: { enabled: true, mainIdSlot: 2, compactorIdSlot: 3 }, compactor: { model: "zipper" }, thresholds: { minChars: 10, maxInputChars: 20000 } });
     expect(settings.mode).toBe("all");
-    expect(settings.compressionRole).toBe("ultra-grug");
     expect(settings.compactor.model).toBe("zipper");
     expect(settings.llamaCppSlots).toEqual({ enabled: true, mainIdSlot: 2, compactorIdSlot: 3 });
     expect(settings.thresholds.minChars).toBe(10);
@@ -29,10 +26,8 @@ describe("resolveReasoningZipSettings", () => {
     const autoSettings = resolveReasoningZipSettings({ llamaCppSlots: { enabled: "auto" } });
     expect(autoSettings.llamaCppSlots.enabled).toBe("auto");
 
-    const settings = resolveReasoningZipSettings({ mode: "bad", storageMode: "rewrite-all", compressionRole: "word-soup", llamaCppSlots: { enabled: "bad" } });
+    const settings = resolveReasoningZipSettings({ mode: "bad", llamaCppSlots: { enabled: "bad" } });
     expect(settings.mode).toBe("local-only");
-    expect(settings.storageMode).toBe("compact-new");
-    expect(settings.compressionRole).toBe("grug");
     expect(settings.llamaCppSlots.enabled).toBe(false);
   });
 
@@ -46,5 +41,19 @@ describe("resolveReasoningZipSettings", () => {
 
     expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(0.25);
     expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(0.25);
+  });
+
+  it("ignores removed development settings", () => {
+    const settings = resolveReasoningZipSettings({
+      mode: "disabled",
+      storageMode: "off",
+      compressionRole: "balanced",
+      injectPrompt: true,
+    });
+
+    expect(settings.mode).toBe("local-only");
+    expect(settings).not.toHaveProperty("storageMode");
+    expect(settings).not.toHaveProperty("compressionRole");
+    expect(settings).not.toHaveProperty("injectPrompt");
   });
 });

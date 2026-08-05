@@ -105,12 +105,11 @@ describe("compactAssistantMessage", () => {
     expect(result.changed).toBe(false);
   });
 
-  it("storage off and disabled mode skip compaction", async () => {
-    for (const offSettings of [resolveReasoningZipSettings({ mode: "all", storageMode: "off" }), resolveReasoningZipSettings({ mode: "disabled" })]) {
-      const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
-      const result = await compactAssistantMessage(message, offSettings, async () => "zip");
-      expect(result.changed).toBe(false);
-    }
+  it("disabled extension skips compaction", async () => {
+    const offSettings = resolveReasoningZipSettings({ enabled: false, mode: "all" });
+    const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
+    const result = await compactAssistantMessage(message, offSettings, async () => "zip");
+    expect(result.changed).toBe(false);
   });
 
   it("leaves string content unchanged", async () => {

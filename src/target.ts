@@ -27,7 +27,7 @@ function isLocalProvider(providerId: string | undefined): boolean {
 }
 
 export function shouldHandleMessage(message: PiMessage, settings: ReasoningZipSettings): boolean {
-  if (!settings.enabled || settings.mode === "disabled" || settings.storageMode !== "compact-new") return false;
+  if (!settings.enabled) return false;
   if (message.role !== "assistant") return false;
 
   const provider = typeof message.provider === "string" ? message.provider : undefined;
@@ -38,7 +38,7 @@ export function shouldHandleMessage(message: PiMessage, settings: ReasoningZipSe
 }
 
 export function shouldTargetProvider(provider: string | undefined, settings: ReasoningZipSettings): boolean {
-  if (!settings.enabled || settings.mode === "disabled") return false;
+  if (!settings.enabled) return false;
   if (settings.mode === "all") return true;
   if (settings.mode === "llama-only") return isLlamaProvider(provider);
   if (settings.mode === "local-only") return isLocalProvider(provider);

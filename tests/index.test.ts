@@ -367,26 +367,6 @@ describe("extension entrypoint", () => {
     expect(notifications).toEqual([]);
   });
 
-  it("storage-off auto mode does not probe or pin", async () => {
-    const cwd = await tempProject({
-      enabled: true,
-      mode: "llama-only",
-      storageMode: "off",
-      llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
-      compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
-    });
-    const handlers = loadExtension();
-    const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    const result = await handlers.get("before_provider_request")!(
-      { provider: "llama-server=http://127.0.0.1:7489", payload: { messages: [] } },
-      { cwd },
-    );
-
-    expect(result).toBeUndefined();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it("enabling auto mode during a generation fails closed", async () => {
     const cwd = await tempProject({
       enabled: false,

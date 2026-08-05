@@ -19,8 +19,10 @@ describe("compactWithOpenAI", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://local.test/v1/chat/completions");
     expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer key" });
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.model).toBe("zip");
+    expect(body.temperature).toBe(0.1);
     expect(body.messages[1].content).toContain("original thinking");
     expect(body.messages[1].content).toContain("Style=fragments");
     expect(body.messages[0].content).toBe("You compress reasoning traces. Output only compact trace.");
@@ -42,19 +44,6 @@ describe("compactWithOpenAI", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
     expect(body.max_tokens).toBe(500);
-  });
-
-  it("passes configured compression role into the compaction prompt", async () => {
-    const customSettings = resolveReasoningZipSettings({ compressionRole: "ultra-grug", compactor: { baseUrl: "http://local.test/v1", model: "zip", apiKey: "key" } });
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
-    } as Response);
-
-    await compactWithOpenAI("thinking", customSettings);
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    expect(body.messages[1].content).toContain("Style=shortest safe fragments");
   });
 
   it("pins compactor requests to the configured llama.cpp slot", async () => {

@@ -8,7 +8,7 @@ describe("target policy", () => {
     expect(isLlamaProvider("openai")).toBe(false);
   });
 
-  it("accepts llama provider in llama-only mode", () => {
+  it("accepts a local llama provider in the default local-only mode", () => {
     const settings = resolveReasoningZipSettings({});
     expect(shouldHandleMessage({ role: "assistant", provider: "llama-server=http://127.0.0.1:7484" }, settings)).toBe(true);
   });

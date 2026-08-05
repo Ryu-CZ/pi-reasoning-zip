@@ -232,7 +232,7 @@ async function shouldPinSlots(
   // Auto mode is conservative: only pin when the shared local llama.cpp server
   // reports at least two parallel slots. With one slot, id_slot wraps to the
   // only slot and cannot prevent prompt/KV cache invalidation.
-  if (!settings.enabled || settings.mode === "disabled" || settings.storageMode !== "compact-new") {
+  if (!settings.enabled) {
     return { pinning: false, skipCompactor: false };
   }
   if (!isSlotCapableProvider(provider, ctx, settings)) {
@@ -354,7 +354,6 @@ interface InFlightSlotState {
   overlapping: boolean;
   extensionEnabled: boolean;
   mode: ReasoningZipSettings["mode"];
-  storageMode: ReasoningZipSettings["storageMode"];
   slotMode: ReasoningZipSettings["llamaCppSlots"]["enabled"];
   mainIdSlot: number;
   compactorIdSlot: number;
@@ -379,7 +378,6 @@ function requestMatchesContextModel(event: BeforeProviderRequestEvent, ctx: Hook
 function slotSettingsMatch(state: InFlightSlotState, provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): boolean {
   return state.extensionEnabled === settings.enabled
     && state.mode === settings.mode
-    && state.storageMode === settings.storageMode
     && state.slotMode === settings.llamaCppSlots.enabled
     && state.mainIdSlot === settings.llamaCppSlots.mainIdSlot
     && state.compactorIdSlot === settings.llamaCppSlots.compactorIdSlot
@@ -473,7 +471,6 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
       overlapping: false,
       extensionEnabled: settings.enabled,
       mode: settings.mode,
-      storageMode: settings.storageMode,
       slotMode: settings.llamaCppSlots.enabled,
       mainIdSlot: settings.llamaCppSlots.mainIdSlot,
       compactorIdSlot: settings.llamaCppSlots.compactorIdSlot,

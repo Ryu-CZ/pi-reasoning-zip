@@ -118,12 +118,10 @@ Project settings override global settings, except `footerStatus`, which is read 
 |---|---|---|
 | `enabled` | `true` | Enable extension behavior |
 | `mode` | `local-only` | Select eligible providers |
-| `storageMode` | `compact-new` | Compact new messages or leave storage unchanged |
-| `compressionRole` | `grug` | Select compactor output style |
 | `footerStatus` | `🗜️ Zip` | Footer text from global settings |
 | `llamaCppSlots.enabled` | `false` | Opt in to llama.cpp slot pinning |
 
-See [Configuration](docs/configuration.md) for every field, default, mode, role, endpoint option, and threshold.
+See [Configuration](docs/configuration.md) for every field, default, targeting mode, endpoint option, slot control, and threshold.
 
 ## llama.cpp cache isolation
 

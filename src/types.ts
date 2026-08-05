@@ -1,7 +1,4 @@
-export type ReasoningZipMode = "llama-only" | "local-only" | "all" | "disabled";
-export type ReasoningZipStorageMode = "compact-new" | "off";
-export type ReasoningZipCompressionRole = "balanced" | "grug" | "ultra-grug";
-
+export type ReasoningZipMode = "llama-only" | "local-only" | "all";
 export type ReasoningZipSlotMode = boolean | "auto";
 
 /** Result of checking whether main and compactor requests can use isolated slots. */
@@ -17,8 +14,6 @@ export interface AutoSlotDecision {
 export interface ReasoningZipSettings {
   enabled: boolean;
   mode: ReasoningZipMode;
-  storageMode: ReasoningZipStorageMode;
-  compressionRole: ReasoningZipCompressionRole;
   footerStatus: string;
   llamaCppSlots: {
     enabled: ReasoningZipSlotMode;
