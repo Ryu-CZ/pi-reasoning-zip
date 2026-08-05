@@ -21,7 +21,6 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.llamaCppSlots).toEqual({ enabled: true, mainIdSlot: 2, compactorIdSlot: 3 });
     expect(settings.thresholds.minChars).toBe(10);
     expect(settings.thresholds.maxInputChars).toBe(20000);
-    expect(settings.injectPrompt).toBe(true);
     expect(settings.footerStatus).toBe("Zip On");
   });
 
@@ -34,5 +33,10 @@ describe("resolveReasoningZipSettings", () => {
     expect(settings.storageMode).toBe("compact-new");
     expect(settings.compressionRole).toBe("grug");
     expect(settings.llamaCppSlots.enabled).toBe(false);
+  });
+
+  it("removes all trailing slashes from the compactor base URL", () => {
+    const settings = resolveReasoningZipSettings({ compactor: { baseUrl: "http://local.test/v1///" } });
+    expect(settings.compactor.baseUrl).toBe("http://local.test/v1");
   });
 });

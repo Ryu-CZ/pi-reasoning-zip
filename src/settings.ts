@@ -8,7 +8,6 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   mode: "local-only",
   storageMode: "compact-new",
   compressionRole: "grug",
-  injectPrompt: true,
   footerStatus: "🗜️ Zip",
   llamaCppSlots: {
     enabled: false,
@@ -146,7 +145,6 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
     mode,
     storageMode,
     compressionRole,
-    injectPrompt: booleanValue(root.injectPrompt, DEFAULT_SETTINGS.injectPrompt),
     footerStatus: stringValue(root.footerStatus, DEFAULT_SETTINGS.footerStatus),
     llamaCppSlots: {
       enabled: slotModeValue(llamaCppSlots.enabled, DEFAULT_SETTINGS.llamaCppSlots.enabled),
@@ -154,7 +152,7 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
       compactorIdSlot: integerValue(llamaCppSlots.compactorIdSlot, DEFAULT_SETTINGS.llamaCppSlots.compactorIdSlot, 0),
     },
     compactor: {
-      baseUrl: stringValue(compactor.baseUrl, DEFAULT_SETTINGS.compactor.baseUrl).replace(/\/$/, ""),
+      baseUrl: stringValue(compactor.baseUrl, DEFAULT_SETTINGS.compactor.baseUrl).replace(/\/+$/, ""),
       model: stringValue(compactor.model, DEFAULT_SETTINGS.compactor.model),
       apiKey: stringValue(compactor.apiKey, DEFAULT_SETTINGS.compactor.apiKey),
       maxTokens: numberValue(compactor.maxTokens, DEFAULT_SETTINGS.compactor.maxTokens, 1),

@@ -29,16 +29,16 @@ describe("compactAssistantMessage", () => {
     expect(result.changed).toBe(false);
   });
 
-  it("preserves tool-call messages without compacting their reasoning", async () => {
+  it("compacts eligible reasoning while preserving tool calls", async () => {
     let called = false;
     const result = await compactAssistantMessage(
       { role: "assistant", content: [{ type: "text", text: "hello" }, { type: "toolCall", id: "1", name: "read", arguments: {} }, { type: "thinking", thinking: "abcdef" }] },
       settings,
       async () => { called = true; return "zip"; },
     );
-    expect(result.changed).toBe(false);
-    expect(called).toBe(false);
-    expect(result.message.content).toMatchObject([{ type: "text", text: "hello" }, { type: "toolCall", id: "1" }, { type: "thinking", thinking: "abcdef" }]);
+    expect(result.changed).toBe(true);
+    expect(called).toBe(true);
+    expect(result.message.content).toMatchObject([{ type: "text", text: "hello" }, { type: "toolCall", id: "1" }, { type: "thinking", thinking: "zip" }]);
   });
 
   it("keeps multiple thinking block order", async () => {

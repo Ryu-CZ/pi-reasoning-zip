@@ -22,7 +22,8 @@ describe("compactWithOpenAI", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.model).toBe("zip");
     expect(body.messages[1].content).toContain("original thinking");
-    expect(body.messages[1].content).toContain("Compression role: grug");
+    expect(body.messages[1].content).toContain("Style=fragments");
+    expect(body.messages[0].content).toBe("You compress reasoning traces. Output only compact trace.");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(body.thinking_budget_tokens).toBe(0);
   });
@@ -37,7 +38,7 @@ describe("compactWithOpenAI", () => {
     await compactWithOpenAI("thinking", customSettings);
 
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    expect(body.messages[1].content).toContain("Compression role: ultra-grug");
+    expect(body.messages[1].content).toContain("Style=shortest safe fragments");
   });
 
   it("pins compactor requests to the configured llama.cpp slot", async () => {

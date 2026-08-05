@@ -15,7 +15,7 @@ The extension already has:
 - forward-only compaction of newly finalized assistant messages
 - guards for signed, encrypted, redacted, and provider-opaque reasoning
 - bounded input and output sizes, request timeouts, and fail-open preservation
-- unit tests for settings, targeting, prompt injection, compaction, and hooks
+- unit tests for settings, targeting, compaction, and hooks
 - a mocked extension smoke test and a clean package build
 - CI for typecheck, tests, build, smoke, and package inspection
 - an initial local compression benchmark
@@ -109,9 +109,8 @@ compaction before the user has validated the endpoint and model.
 
 **Acceptance criteria:**
 
-- A fresh install performs no compaction or prompt injection until explicitly
+- A fresh install performs no compaction until explicitly
   configured or enabled.
-- Compaction and prompt injection can be enabled independently.
 - `/reasoning-zip status` explains why the extension is inactive and what is
   required to activate it.
 - Upgrade behavior is documented for existing users.
@@ -146,7 +145,6 @@ continue correctly from the compacted trace.
 - A checked-in harness runs sanitized, repeatable continuation tasks.
 - Results include stored-context savings, retained facts and exact identifiers,
   continuation success, failure rate, compactor requests, and p50/p95 latency.
-- Prompt injection enabled and disabled are evaluated separately.
 - Quality evaluation is independent of the model that produced the summary, or
   validated against deterministic task outcomes.
 - Minimum quality and reliability thresholds are documented before `1.0.0`.

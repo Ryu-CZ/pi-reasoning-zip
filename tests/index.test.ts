@@ -1,9 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import reasoningZipExtension from "../src/index.js";
-import { PROMPT_MARKER } from "../src/promptInjection.js";
 
 type Handler = (event: any, ctx?: any) => any;
 
@@ -25,6 +24,12 @@ function loadExtensionSurface(): { handlers: Map<string, Handler>; commands: Map
 
 let tempDirs: string[] = [];
 const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+
+beforeEach(async () => {
+  const agentDir = await mkdtemp(join(tmpdir(), "reasoning-zip-agent-"));
+  tempDirs.push(agentDir);
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+});
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -198,18 +203,22 @@ describe("extension entrypoint", () => {
     expect(result).toBeUndefined();
   });
 
-  it("before_provider_request injects only for changed payloads", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only" });
+  it("never changes the main-model prompt when slot pinning is disabled", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: false } });
     const handler = loadExtension().get("before_provider_request")!;
-    const injected = await handler({ provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
-    expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+    const payload = { messages: [{ role: "system", content: "keep this exact" }, { role: "user", content: "hello" }] };
 
-    const skipped = await handler({ provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } }, { cwd });
-    expect(skipped).toBeUndefined();
+    const result = await handler(
+      { provider: "llama-server=http://127.0.0.1:7484", payload },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+    expect(payload.messages[0].content).toBe("keep this exact");
   });
 
   it("before_provider_request pins main llama.cpp requests without overriding explicit id_slot", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
     const handler = loadExtension().get("before_provider_request")!;
 
     const pinned = await handler(
@@ -227,7 +236,7 @@ describe("extension entrypoint", () => {
   });
 
   it("forced slot pinning does not add llama.cpp fields to non-llama providers", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "all", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 }, thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const cwd = await tempProject({ enabled: true, mode: "all", llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 }, thresholds: { minChars: 5, maxTraceChars: 100 } });
     const handlers = loadExtension();
     const provider = "openai";
 
@@ -254,7 +263,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { apiKey: "slot-secret" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -283,7 +291,7 @@ describe("extension entrypoint", () => {
   });
 
   it("before_provider_request auto-pins custom OpenAI-compatible llama.cpp models when /slots works", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "all", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7487/v1" } });
+    const cwd = await tempProject({ enabled: true, mode: "all", llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7487/v1" } });
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
     const handler = loadExtension().get("before_provider_request")!;
 
@@ -296,7 +304,7 @@ describe("extension entrypoint", () => {
   });
 
   it("before_provider_request does not auto-pin same-origin but different-path llama.cpp servers", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7488/zip/v1" } });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7488/zip/v1" } });
     const fetchMock = vi.spyOn(globalThis, "fetch");
     const handler = loadExtension().get("before_provider_request")!;
 
@@ -310,7 +318,7 @@ describe("extension entrypoint", () => {
   });
 
   it("before_provider_request deduplicates concurrent auto slot probes", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7486/v1" } });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7486/v1" } });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response);
     const handler = loadExtension().get("before_provider_request")!;
     const event = { provider: "llama-server=http://127.0.0.1:7486", payload: { messages: [{ role: "system", content: "sys" }] } };
@@ -321,7 +329,7 @@ describe("extension entrypoint", () => {
   });
 
   it("before_provider_request does not auto-pin when the shared llama.cpp server has fewer than two slots", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7485/v1" } });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 }, compactor: { baseUrl: "http://127.0.0.1:7485/v1" } });
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }] } as Response);
     const handler = loadExtension().get("before_provider_request")!;
 
@@ -364,7 +372,6 @@ describe("extension entrypoint", () => {
       enabled: true,
       mode: "llama-only",
       storageMode: "off",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
     });
@@ -469,7 +476,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
       thresholds: { minChars: 5 },
@@ -499,7 +505,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
       thresholds: { minChars: 5 },
@@ -529,7 +534,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7489/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -537,31 +541,26 @@ describe("extension entrypoint", () => {
     const handlers = loadExtension();
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
     const notifications: string[] = [];
-    const ctx = { cwd, ui: { notify: (message: string) => notifications.push(message) } };
+    const notify = (message: string) => notifications.push(message);
+    const abandonedCtx = { cwd, signal: new AbortController().signal, ui: { notify } };
+    const nextCtx = { cwd, signal: new AbortController().signal, ui: { notify } };
     const provider = "llama-server=http://127.0.0.1:7489";
     const request = { provider, payload: { messages: [] } };
     const message = { role: "assistant", provider, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
 
-    await handlers.get("before_provider_request")!(request, ctx); // abandoned: no message_end
-    await handlers.get("before_provider_request")!(request, ctx);
-    expect(await handlers.get("message_end")!({ message }, ctx)).toBeUndefined();
-
-    await handlers.get("before_provider_request")!(request, ctx);
-    const recovered = await handlers.get("message_end")!({ message }, ctx);
+    await handlers.get("before_provider_request")!(request, abandonedCtx); // abandoned: no message_end or abort
+    await handlers.get("before_provider_request")!(request, nextCtx);
+    const recovered = await handlers.get("message_end")!({ message }, nextCtx);
 
     expect(recovered.message.content[0].thinking).toBe("zip");
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(notifications).toEqual([
-      "pi-reasoning-zip overlapping provider requests cannot be correlated safely; original reasoning preserved.",
-    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(notifications).toEqual([]);
   });
 
   it("before_provider_request warns when an explicit main id_slot conflicts with compactor id_slot", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only", injectPrompt: false, llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 } });
     const handlers = loadExtension();
     const handler = handlers.get("before_provider_request")!;
     const notifications: Array<{ message: string; level: string | undefined }> = [];
@@ -589,27 +588,83 @@ describe("extension entrypoint", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("before_provider_request can target the real Pi ctx.model provider shape", async () => {
-    const cwd = await tempProject({ enabled: true, mode: "llama-only" });
+  it("before_provider_request can pin the real Pi ctx.model provider shape", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: true, mainIdSlot: 3, compactorIdSlot: 4 } });
     const handler = loadExtension().get("before_provider_request")!;
-    const injected = await handler(
+    const pinned = await handler(
       { type: "before_provider_request", payload: { messages: [{ role: "system", content: "sys" }] } },
-      { cwd, model: { provider: "llama-server=http://127.0.0.1:7484" } },
+      { cwd, model: { id: "main-model", provider: "llama-server=http://127.0.0.1:7484" } },
     );
-    expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+    expect(pinned.id_slot).toBe(3);
+    expect(pinned.messages[0].content).toBe("sys");
+  });
+
+  it("leaves requests for a different model untouched when Pi omits request provider attribution", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "all", llamaCppSlots: { enabled: "auto" } });
+    const handler = loadExtension().get("before_provider_request")!;
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    const result = await handler(
+      { type: "before_provider_request", payload: { model: "compaction-model", messages: [{ role: "system", content: "sys" }] } },
+      { cwd, model: { id: "main-model", provider: "llama-server=http://127.0.0.1:7484", baseUrl: "http://127.0.0.1:7484/v1" } },
+    );
+
+    expect(result).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves explicitly modeled requests untouched when context model attribution is unavailable", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "all" });
+    const handler = loadExtension().get("before_provider_request")!;
+
+    const result = await handler(
+      { type: "before_provider_request", payload: { model: "request-model", messages: [{ role: "system", content: "sys" }] } },
+      { cwd },
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("clears slot state when Pi aborts a provider request", async () => {
+    const cwd = await tempProject({ enabled: true, mode: "llama-only", llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 }, thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const handlers = loadExtension();
+    const controller = new AbortController();
+    const request = { provider: "llama-server=http://127.0.0.1:7484", payload: { messages: [{ role: "system", content: "sys" }] } };
+    const ctx = { cwd, signal: controller.signal };
+
+    await handlers.get("before_provider_request")!(request, ctx);
+    controller.abort();
+
+    const nextController = new AbortController();
+    await handlers.get("before_provider_request")!(request, { cwd, signal: nextController.signal });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
+    const result = await handlers.get("message_end")!(
+      { message: { role: "assistant", provider: "llama-server=http://127.0.0.1:7484", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
+      { cwd },
+    );
+
+    expect(result.message.content[0].thinking).toBe("zip");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a malformed project section and keeps valid global settings", async () => {
     const cwd = await tempProject("invalid");
-    await writeGlobalSettings(cwd, { mode: "all" });
-    const handler = loadExtension().get("before_provider_request")!;
+    await writeGlobalSettings(cwd, { mode: "all", thresholds: { minChars: 5, maxTraceChars: 100 } });
+    const handler = loadExtension().get("message_end")!;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "zip" } }] }),
+    } as Response);
 
-    const injected = await handler(
-      { provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } },
+    const result = await handler(
+      { message: { role: "assistant", provider: "openai", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] } },
       { cwd },
     );
 
-    expect(injected.messages[0].content).toContain(PROMPT_MARKER);
+    expect(result.message.content[0].thinking).toBe("zip");
   });
 
   // ---- cache-isolation hardening tests ----
@@ -618,7 +673,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7490/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -651,7 +705,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7491/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -683,7 +736,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 2 },
       compactor: { baseUrl: "http://127.0.0.1:7492/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -715,7 +767,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 2 },
       compactor: { baseUrl: "http://127.0.0.1:7493/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -749,7 +800,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7495/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -766,7 +816,6 @@ describe("extension entrypoint", () => {
     await writeFile(join(cwd, ".pi", "settings.json"), JSON.stringify({ reasoningZip: {
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 0 },
       compactor: { baseUrl: "http://127.0.0.1:7495/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },
@@ -788,7 +837,6 @@ describe("extension entrypoint", () => {
     const cwd = await tempProject({
       enabled: true,
       mode: "llama-only",
-      injectPrompt: false,
       llamaCppSlots: { enabled: "auto", mainIdSlot: 0, compactorIdSlot: 1 },
       compactor: { baseUrl: "http://127.0.0.1:7494/v1" },
       thresholds: { minChars: 5, maxTraceChars: 100 },

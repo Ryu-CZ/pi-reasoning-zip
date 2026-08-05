@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { compactWithOpenAI } from "./compactorClient.js";
 import { compactAssistantMessage, hasCompactionCandidate } from "./messageTransform.js";
-import { injectLlamaCppMainSlot, injectReasoningZipPrompt } from "./promptInjection.js";
+import { injectLlamaCppMainSlot } from "./slotInjection.js";
 import { inspectEnabledSetting, resolveReasoningZipSettings, type SettingsScope, writeEnabledSetting } from "./settings.js";
 import { isLlamaProvider } from "./target.js";
 import type { AutoSlotDecision, PiMessage, ReasoningZipSettings } from "./types.js";
@@ -16,7 +16,8 @@ const FOOTER_STATUS_KEY = "reasoning-zip";
 
 interface HookContext {
   cwd?: string;
-  model?: { provider?: string; baseUrl?: string };
+  model?: { id?: string; provider?: string; baseUrl?: string };
+  signal?: AbortSignal;
 }
 
 interface MessageEndEvent {
@@ -165,18 +166,27 @@ function withSlotPinning(settings: ReasoningZipSettings, enabled: boolean): Reas
   return { ...settings, llamaCppSlots: { ...settings.llamaCppSlots, enabled } };
 }
 
-const pendingSlotProbes = new Map<string, Promise<number | undefined>>();
+const SLOT_PROBE_TIMEOUT_MS = 2000;
+const SLOT_PROBE_CACHE_MS = 5000;
 
-async function probeLlamaCppSlotCount(baseUrl: string, apiKey: string): Promise<number | undefined> {
+async function probeLlamaCppSlotCount(
+  baseUrl: string,
+  apiKey: string,
+  pendingSlotProbes: Map<string, Promise<number | undefined>>,
+  completedSlotProbes: Map<string, { slotCount: number; expiresAt: number }>,
+): Promise<number | undefined> {
   const url = slotsUrl(baseUrl);
   if (!url) return undefined;
   const probeKey = `${url}\n${apiKey}`;
+  const cached = completedSlotProbes.get(probeKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.slotCount;
+  if (cached) completedSlotProbes.delete(probeKey);
   const existing = pendingSlotProbes.get(probeKey);
   if (existing) return existing;
 
   const pending = (async () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 500);
+    const timeout = setTimeout(() => controller.abort(), SLOT_PROBE_TIMEOUT_MS);
     try {
       const response = await fetch(url, {
         signal: controller.signal,
@@ -194,7 +204,11 @@ async function probeLlamaCppSlotCount(baseUrl: string, apiKey: string): Promise<
 
   pendingSlotProbes.set(probeKey, pending);
   try {
-    return await pending;
+    const slotCount = await pending;
+    if (slotCount !== undefined) {
+      completedSlotProbes.set(probeKey, { slotCount, expiresAt: Date.now() + SLOT_PROBE_CACHE_MS });
+    }
+    return slotCount;
   } finally {
     pendingSlotProbes.delete(probeKey);
   }
@@ -208,7 +222,13 @@ function idsCollide(mainId: number, compactorId: number, slotCount: number): boo
   return normalizeIdSlot(mainId, slotCount) === normalizeIdSlot(compactorId, slotCount);
 }
 
-async function shouldPinSlots(provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): Promise<AutoSlotDecision> {
+async function shouldPinSlots(
+  provider: string | undefined,
+  ctx: HookContext,
+  settings: ReasoningZipSettings,
+  pendingSlotProbes: Map<string, Promise<number | undefined>>,
+  completedSlotProbes: Map<string, { slotCount: number; expiresAt: number }>,
+): Promise<AutoSlotDecision> {
   // Auto mode is conservative: only pin when the shared local llama.cpp server
   // reports at least two parallel slots. With one slot, id_slot wraps to the
   // only slot and cannot prevent prompt/KV cache invalidation.
@@ -235,7 +255,12 @@ async function shouldPinSlots(provider: string | undefined, ctx: HookContext, se
     return { pinning: false, skipCompactor: false };
   }
   // Shared server: probe for slot count.
-  const slotCount = await probeLlamaCppSlotCount(settings.compactor.baseUrl, settings.compactor.apiKey);
+  const slotCount = await probeLlamaCppSlotCount(
+    settings.compactor.baseUrl,
+    settings.compactor.apiKey,
+    pendingSlotProbes,
+    completedSlotProbes,
+  );
   // Probe failed or count < 2 → fail closed: no compactor, no pinning.
   if (slotCount === undefined || slotCount < 2) {
     return { pinning: false, slotCount, skipCompactor: true };
@@ -335,6 +360,20 @@ interface InFlightSlotState {
   compactorIdSlot: number;
   mainBaseUrl?: string;
   compactorBaseUrl: string;
+  signal?: AbortSignal;
+  abortHandler?: () => void;
+}
+
+function payloadModelId(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
+  const model = (payload as { model?: unknown }).model;
+  return typeof model === "string" ? model : undefined;
+}
+
+function requestMatchesContextModel(event: BeforeProviderRequestEvent, ctx: HookContext): boolean {
+  const requestModel = payloadModelId(event.payload);
+  const contextModel = ctx.model?.id;
+  return requestModel === undefined || (contextModel !== undefined && requestModel === contextModel);
 }
 
 function slotSettingsMatch(state: InFlightSlotState, provider: string | undefined, ctx: HookContext, settings: ReasoningZipSettings): boolean {
@@ -351,6 +390,8 @@ function slotSettingsMatch(state: InFlightSlotState, provider: string | undefine
 export default function reasoningZipExtension(pi: ExtensionAPI) {
   const extension = pi as unknown as ReasoningZipExtension;
   const inFlightSlotStates = new Map<string, InFlightSlotState>();
+  const pendingSlotProbes = new Map<string, Promise<number | undefined>>();
+  const completedSlotProbes = new Map<string, { slotCount: number; expiresAt: number }>();
 
   extension.registerCommand?.("reasoning-zip", {
     description: "Enable, disable, or inspect pi-reasoning-zip",
@@ -371,6 +412,7 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
     const provider = messageProvider(event.message, ctx);
     const key = conflictKey(ctx?.cwd, provider);
     const state = inFlightSlotStates.get(key);
+    if (state?.signal && state.abortHandler) state.signal.removeEventListener("abort", state.abortHandler);
     inFlightSlotStates.delete(key);
 
     if (!hasCompactionCandidate(event.message, settings)) return undefined;
@@ -416,8 +458,12 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
   extension.on("before_provider_request", async (event, ctx) => {
     const settings = resolveReasoningZipSettings(readRawSettings(ctx?.cwd));
     setFooterStatus(ctx, settings.enabled);
+    // Pi's hook omits the actual request model. When the payload explicitly
+    // names a different model than ctx.model, attribution is unsafe; leave the
+    // request untouched rather than pinning it for the wrong provider.
+    if (!requestMatchesContextModel(event, ctx)) return undefined;
     const provider = eventProvider(event, ctx);
-    const decision = await shouldPinSlots(provider, ctx, settings);
+    const decision = await shouldPinSlots(provider, ctx, settings, pendingSlotProbes, completedSlotProbes);
     const key = conflictKey(ctx?.cwd, provider);
     const effectiveSettings = withSlotPinning(settings, decision.pinning);
     const slotResult = injectLlamaCppMainSlot(event.payload, provider, effectiveSettings, decision);
@@ -434,12 +480,32 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
       mainBaseUrl: providerBaseUrl(provider, ctx),
       compactorBaseUrl: settings.compactor.baseUrl,
     };
-    if (inFlightSlotStates.has(key)) state.overlapping = true;
-    inFlightSlotStates.set(key, state);
+    const trackSlotState = settings.llamaCppSlots.enabled !== false && isSlotCapableProvider(provider, ctx, settings);
+    if (trackSlotState) {
+      const existingState = inFlightSlotStates.get(key);
+      if (existingState) {
+        if (existingState.signal && existingState.abortHandler) {
+          existingState.signal.removeEventListener("abort", existingState.abortHandler);
+        }
+        // A different active request signal means the earlier request ended
+        // without message_end (for example, a provider error). Replace that
+        // stale state. A shared or unavailable signal remains ambiguous.
+        state.overlapping = existingState.signal === undefined
+          || ctx.signal === undefined
+          || existingState.signal === ctx.signal;
+      }
+      if (ctx.signal) {
+        state.signal = ctx.signal;
+        state.abortHandler = () => {
+          if (inFlightSlotStates.get(key) === state) inFlightSlotStates.delete(key);
+        };
+        ctx.signal.addEventListener("abort", state.abortHandler, { once: true });
+      }
+      inFlightSlotStates.set(key, state);
+    }
     if (slotResult.conflict) {
       notify(ctx, "pi-reasoning-zip llama.cpp id_slot conflict; original reasoning for this response will be preserved.", "warning");
     }
-    const nextPayload = injectReasoningZipPrompt(slotResult.payload, provider, settings);
-    return nextPayload === event.payload ? undefined : nextPayload;
+    return slotResult.changed ? slotResult.payload : undefined;
   });
 }

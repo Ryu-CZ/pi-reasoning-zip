@@ -19,7 +19,6 @@ export interface ReasoningZipSettings {
   mode: ReasoningZipMode;
   storageMode: ReasoningZipStorageMode;
   compressionRole: ReasoningZipCompressionRole;
-  injectPrompt: boolean;
   footerStatus: string;
   llamaCppSlots: {
     enabled: ReasoningZipSlotMode;

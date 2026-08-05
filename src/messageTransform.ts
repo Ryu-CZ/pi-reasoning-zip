@@ -29,7 +29,6 @@ function isCompactableThinkingBlock(block: PiMessageBlock, settings: ReasoningZi
 
 export function hasCompactionCandidate(message: PiMessage, settings: ReasoningZipSettings): boolean {
   if (!shouldHandleMessage(message, settings) || !Array.isArray(message.content)) return false;
-  if (message.content.some((block) => block.type === "toolCall")) return false;
   return message.content.some((block) => isCompactableThinkingBlock(block, settings));
 }
 

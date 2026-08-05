@@ -9,7 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Replaced the README's 2026-07-09 local benchmark with an isolated five-task Pi `0.83.0` benchmark using `thresholds.minChars: 400`; documented exact-trace compression and retention results, short-trace tradeoffs, live llama.cpp slot isolation, multi-turn KV-cache retention, host-specific generation speeds, and estimated long-session prompt-processing savings.
+- Replaced the README's 2026-07-09 local benchmark with an isolated five-task Pi `0.83.0` benchmark (`thresholds.minChars: 400`) covering exact-trace compression, retention, slot isolation, multi-turn KV-cache reuse, and estimated long-session savings.
+- Split the README into a quick start with the full reference in `docs/` (`benchmark.md`, `configuration.md`, `llama-cpp-slot-pinning.md`) and added `CONTRIBUTING.md`.
+- Compact eligible thinking in tool-call messages while preserving tool-call blocks unchanged.
+- Reworked the compactor prompt into a lossless state ledger (typed `F/C/D/X/U/R/O/N` buckets) that copies exact values, keeps causal order and complete dead-end rationale, and never emits its own instruction text; its `none` escape hatch now fires only when no useful state remains.
+
+### Removed
+
+- Removed the `injectPrompt` setting and all main-model prompt mutation; `before_provider_request` now only manages optional llama.cpp slot isolation fields.
+
+### Fixed
+
+- Isolated tests and the compiled smoke harness from the user's real global Pi settings so checks run deterministically on any machine.
+- Made llama.cpp auto-mode slot probes less fragile: two-second timeout with successful topology results cached for five seconds.
+- Leave provider requests untouched when their payload model differs from Pi's current context model, avoiding unsafe provider attribution.
+- Clear request-bound slot state when Pi aborts a provider request, and replace stale state when a later request has a different request signal.
+- Normalize all trailing slashes from the configured compactor base URL.
 
 ## [0.5.0] - 2026-07-31
 

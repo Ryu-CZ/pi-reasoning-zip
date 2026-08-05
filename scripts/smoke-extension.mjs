@@ -8,6 +8,9 @@ function assert(condition, message) {
 }
 
 const cwd = await mkdtemp(join(tmpdir(), "pi-reasoning-zip-smoke-"));
+const agentDir = await mkdtemp(join(tmpdir(), "pi-reasoning-zip-smoke-agent-"));
+const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+process.env.PI_CODING_AGENT_DIR = agentDir;
 try {
   await mkdir(join(cwd, ".pi"), { recursive: true });
   await writeFile(
@@ -16,6 +19,7 @@ try {
       reasoningZip: {
         enabled: true,
         mode: "llama-only",
+        llamaCppSlots: { enabled: true, mainIdSlot: 0, compactorIdSlot: 1 },
         thresholds: { minChars: 5, maxTraceChars: 100 },
         compactor: { baseUrl: "http://mock.local/v1", model: "mock", timeoutMs: 1000 },
       },
@@ -60,14 +64,16 @@ try {
     assert(compacted.message.content[1].thinking === "facts:\n- smoke compacted", "thinking block was not compacted");
     assert(compacted.message.metadata.keep === true, "assistant metadata was not preserved");
 
-    const injected = await handlers.get("before_provider_request")(
+    const pinned = await handlers.get("before_provider_request")(
       {
         provider: "llama-server=http://127.0.0.1:7484",
         payload: { messages: [{ role: "system", content: "sys" }, { role: "user", content: "hi" }] },
       },
       { cwd },
     );
-    assert(injected.messages[0].content.includes("<!-- pi-reasoning-zip -->"), "prompt marker was not injected");
+    assert(pinned.id_slot === 0, "main request was not pinned to its configured slot");
+    assert(pinned.cache_prompt === true, "main request did not enable prompt caching");
+    assert(pinned.messages[0].content === "sys", "main-model prompt was modified");
 
     const skipped = await handlers.get("before_provider_request")(
       { provider: "openai", payload: { messages: [{ role: "system", content: "sys" }] } },
@@ -80,5 +86,8 @@ try {
 
   console.log("pi-reasoning-zip smoke passed");
 } finally {
+  if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+  else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
   await rm(cwd, { recursive: true, force: true });
+  await rm(agentDir, { recursive: true, force: true });
 }
