@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-06
+
 ### Changed
 
 - Rebuilt the README benchmark section from the latest production-default artifacts, separating automated checks, manual review, host-specific measurements, and limitations while removing the obsolete capped stress-test headline; added a ratio-reliability table, an inline metric note, a complete benchmark glossary, and its raw sweep artifact.
@@ -191,7 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.5.0...v0.6.0
