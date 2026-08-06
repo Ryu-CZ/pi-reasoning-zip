@@ -1,12 +1,12 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-06T09:56:20.505Z",
+    "generatedAt": "2026-08-06T12:57:15.624Z",
     "endpoint": "http://127.0.0.1:7484/v1",
     "model": "unsloth",
     "ratios": [
       1
     ],
-    "maxTraceChars": 2000,
+    "maxTraceChars": -1,
     "estimatedCharsPerToken": 3,
     "fixture": "traces.json",
     "decoding": {
@@ -29,25 +29,25 @@
       "split": "development",
       "sourceChars": 2004,
       "maxTokens": 668,
-      "text": "F: first bad build v2.18.1; known-good build v2.17.6\nF: service file /srv/checkout/config/routes.yaml\nF: 14:07 UTC p95 latency 182 ms to 947 ms; HTTP 502 rate 0.4% to 8.7%\nF: causal order: deploy v2.18.1 completed, schema migration 20260805_add_route_key ran, error rate increased\nX: `kubectl rollout undo deploy/checkout -n payments --to-revision=41`; restored pods but not database schema; 502 stayed at 7.9%; cannot use because schema mismatch\nC: do not delete column route_key while any v2.18.1 worker remains (writes it)\nD: use forward-compatible rollback playbook\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nO: verify zero v2.18.1 pods\nN: `/opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run`\nR: if dry run reports more than 250 affected rows, abort and page DB on-call\nN: if dry run reports 250 or fewer, rerun without --dry-run and deploy v2.17.6\nR: roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum sha256:8dd15f03\nU: 31 malformed route records caused all 502s (hypothesis, not finding)\nO: p95 below 250 ms and 502 below 1.0% for 15 consecutive minutes\nO: did partner eu-west send empty route keys before 14:07 UTC?\nN: exactly `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nX: direct column deletion; reconsider only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z",
+      "text": "F: first bad build v2.18.1; known-good build v2.17.6\nF: service file /srv/checkout/config/routes.yaml\nF: 14:07 UTC p95 latency 182 ms to 947 ms; HTTP 502 rate 0.4% to 8.7%\nF: causal order: deploy v2.18.1 completed, schema migration 20260805_add_route_key ran, error rate increased\nX: `kubectl rollout undo deploy/checkout -n payments --to-revision=41`; restored pods but not database schema; 502 stayed at 7.9%; cannot use because schema mismatch\nC: do not delete column route_key while any v2.18.1 worker remains (they write it)\nD: use forward-compatible rollback playbook\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nO: verify zero v2.18.1 pods\nN: `/opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run`\nR: if dry run reports more than 250 affected rows, abort and page DB on-call\nN: if dry run reports 250 or fewer, rerun without --dry-run and deploy v2.17.6\nR: roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum equals sha256:8dd15f03\nU: 31 malformed route records caused all 502s (hypothesis, not finding)\nO: p95 below 250 ms and 502 below 1.0% for 15 consecutive minutes\nO: did partner eu-west send empty route keys before 14:07 UTC?\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nX: direct column deletion; cannot use while v2.18.1 writers exist; reconsider if all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z",
       "finishReason": "stop",
       "usage": {
-        "completion_tokens": 487,
+        "completion_tokens": 500,
         "prompt_tokens": 907,
-        "total_tokens": 1394,
+        "total_tokens": 1407,
         "prompt_tokens_details": {
           "cached_tokens": 0
         }
       },
-      "latencyMs": 5547,
+      "latencyMs": 6244,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
-      "outputChars": 1425,
-      "thinkingReduction": 0.2889221556886228,
+      "outputChars": 1460,
+      "thinkingReduction": 0.27145708582834327,
       "originalSessionBytes": 2359,
-      "storedSessionBytes": 1797,
-      "wholeSessionReduction": 0.23823654090716406,
+      "storedSessionBytes": 1832,
+      "wholeSessionReduction": 0.2233997456549386,
       "exactRetention": {
         "retained": [
           "v2.18.1",
@@ -100,28 +100,28 @@
       },
       "instructionLeakage": [],
       "continuation": {
-        "text": "{\n  \"next\": \"kubectl scale deploy/checkout-canary -n payments --replicas=0\",\n  \"rollback\": \"roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum sha256:8dd15f03\",\n  \"uncertainty\": \"31 malformed route records caused all 502s (hypothesis, not finding)\",\n  \"reconsider\": \"reconsider only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z\",\n  \"deadEnd\": \"cannot use because schema mismatch\"\n}",
+        "text": "{\n  \"next\": \"kubectl scale deploy/checkout-canary -n payments --replicas=0\",\n  \"rollback\": \"roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum equals sha256:8dd15f03\",\n  \"uncertainty\": \"did partner eu-west send empty route keys before 14:07 UTC?\",\n  \"reconsider\": \"if all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z\",\n  \"deadEnd\": \"cannot use because schema mismatch\"\n}",
         "finishReason": "stop",
         "usage": {
-          "completion_tokens": 163,
-          "prompt_tokens": 584,
-          "total_tokens": 747,
+          "completion_tokens": 158,
+          "prompt_tokens": 597,
+          "total_tokens": 755,
           "prompt_tokens_details": {
             "cached_tokens": 0
           }
         },
-        "latencyMs": 8499,
+        "latencyMs": 2332,
         "parsed": {
           "next": "kubectl scale deploy/checkout-canary -n payments --replicas=0",
-          "rollback": "roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum sha256:8dd15f03",
-          "uncertainty": "31 malformed route records caused all 502s (hypothesis, not finding)",
-          "reconsider": "reconsider only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z",
+          "rollback": "roll back rollback by redeploying v2.18.1 only if replication lag below 3 s and schema checksum equals sha256:8dd15f03",
+          "uncertainty": "did partner eu-west send empty route keys before 14:07 UTC?",
+          "reconsider": "if all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z",
           "deadEnd": "cannot use because schema mismatch"
         },
         "checks": {
           "next": true,
           "rollback": true,
-          "uncertainty": true,
+          "uncertainty": false,
           "reconsider": true,
           "deadEnd": false
         },
@@ -145,7 +145,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6968,
+      "latencyMs": 6178,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -218,7 +218,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 8745,
+        "latencyMs": 2183,
         "parsed": {
           "next": "Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json` before migration.",
           "rollback": "`DROP INDEX CONCURRENTLY capture_once`; does not undo captures already sent.",
@@ -243,25 +243,25 @@
       "split": "development",
       "sourceChars": 2364,
       "maxTokens": 788,
-      "text": "F: Implement event-window in `src/window/maxDistinct.ts`.\nF: Input timestamps sorted, may repeat.\nC: Window inclusive both ends: retain j if `ts[j] >= ts[i] - 3000`.\nC: Output max distinct `user_id` count.\nC: Memory O(k), k=users in active window; no window copying.\nC: Do not mutate caller input.\nX: Set + delete on oldest leave. Result: Incorrect. Why: User u17 events at 1000, 2500; 1000 leaves, u17 must remain for 2500. Reconsider if input guaranteed ≤1 event/user (not guaranteed).\nX: Sort copy by `user_id` per right endpoint. Result: Correct but 18.4 s on 2,000,000 events. Why: Violates 2 s target. Reconsider if input limit <10,000 events.\nD: Two pointers + `Map<string, number>` freq counts. Why: Meets constraints.\nD: Advance right, increment freq. Advance left while `ts[right] - ts[left] > 3000`, decrement, delete at 0. Compare `map.size` with best.\nC: Keep `> 3000`; `>= 3000` makes boundary exclusive (incorrect).\nF: Invariant: Before recording best, active ts differ from `ts[right]` by ≤3000 ms; map count = occurrences between left/right.\nO: Test command: `npm test -- --run tests/window/maxDistinct.test.ts`.\nO: Add cases: `[(1000,u17),(2500,u17),(4000,u22)] => 2`; `[(0,a),(3000,b)] => 2`.\nU: Unicode-normalized `user_id` might compare unequal; normalization outside contract, not confirmed bug.\nR: If heap >96 MiB on `/tmp/window-2m.ndjson`, abort Map version, profile key retention.\nR: Rollback to commit `7b31c2a` (correct only for unique-user input).\nO: Success: All unit tests pass, 2,000,000 events <2 s, heap <96 MiB.\nN: Run `npm test -- --run tests/window/maxDistinct.test.ts`.\nO: Open: Malformed negative timestamps throw or skip?",
+      "text": "F: Implement event-window in `src/window/maxDistinct.ts`.\nF: Input timestamps sorted, may repeat.\nC: Window inclusive both ends: retain j if `ts[j] >= ts[i] - 3000`.\nC: Output max distinct `user_id` count.\nC: Memory O(k), k=users in active window; no window copying.\nC: Do not mutate caller input.\nX: Set + delete on oldest leave. Result: Incorrect. Why: User u17 events at 1000, 2500; 1000 leaves, u17 must remain for 2500. Reconsider if input guaranteed ≤1 event/user (not guaranteed).\nX: Sort copy by `user_id` per right endpoint. Result: Correct but 18.4 s on 2,000,000 events. Why: Violates 2 s target. Reconsider if input limit <10,000 events.\nD: Two pointers + `Map<string, number>` freq counts. Why: Meets constraints.\nD: Advance right, increment freq. Advance left while `ts[right] - ts[left] > 3000`, decrement, delete at 0. Compare `map.size` with best.\nC: Keep `> 3000`; `>= 3000` makes boundary exclusive (incorrect).\nF: Invariant: Before recording best, active ts differ from `ts[right]` by ≤3000 ms; map count = occurrences between left/right.\nO: Test command: `npm test -- --run tests/window/maxDistinct.test.ts`.\nO: Add cases: `[(1000,u17),(2500,u17),(4000,u22)] => 2`, `[(0,a),(3000,b)] => 2`.\nU: Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug.\nR: If heap >96 MiB on `/tmp/window-2m.ndjson`, abort Map version, profile key retention.\nR: Rollback to commit `7b31c2a` (correct only for unique-user input).\nO: Open: Malformed negative timestamps throw or skip?\nO: Success: All unit tests pass, 2,000,000 events <2 s, heap <96 MiB.\nN: Run `npm test -- --run tests/window/maxDistinct.test.ts`.",
       "finishReason": "stop",
       "usage": {
-        "completion_tokens": 545,
+        "completion_tokens": 543,
         "prompt_tokens": 938,
-        "total_tokens": 1483,
+        "total_tokens": 1481,
         "prompt_tokens_details": {
           "cached_tokens": 0
         }
       },
-      "latencyMs": 8904,
+      "latencyMs": 7669,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
-      "outputChars": 1661,
-      "thinkingReduction": 0.2973773265651438,
+      "outputChars": 1660,
+      "thinkingReduction": 0.2978003384094755,
       "originalSessionBytes": 2719,
-      "storedSessionBytes": 2039,
-      "wholeSessionReduction": 0.25009194556822356,
+      "storedSessionBytes": 2038,
+      "wholeSessionReduction": 0.25045972784111803,
       "exactRetention": {
         "retained": [
           "src/window/maxDistinct.ts",
@@ -310,28 +310,28 @@
       },
       "instructionLeakage": [],
       "continuation": {
-        "text": "{\n  \"next\": \"Run `npm test -- --run tests/window/maxDistinct.test.ts`.\",\n  \"rollback\": \"Rollback to commit `7b31c2a` (correct only for unique-user input).\",\n  \"uncertainty\": \"Unicode-normalized `user_id` might compare unequal; normalization outside contract, not confirmed bug.\",\n  \"reconsider\": \"Reconsider if input guaranteed ≤1 event/user (not guaranteed).\",\n  \"deadEnd\": \"Sort copy by `user_id` per right endpoint. Result: Correct but 18.4 s on 2,000,000 events. Why: Violates 2 s target.\"\n}",
+        "text": "{\n  \"next\": \"Run `npm test -- --run tests/window/maxDistinct.test.ts`.\",\n  \"rollback\": \"Rollback to commit `7b31c2a` (correct only for unique-user input).\",\n  \"uncertainty\": \"Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug.\",\n  \"reconsider\": \"Reconsider if input guaranteed ≤1 event/user (not guaranteed).\",\n  \"deadEnd\": \"Sort copy by `user_id` per right endpoint. Result: Correct but 18.4 s on 2,000,000 events. Why: Violates 2 s target.\"\n}",
         "finishReason": "stop",
         "usage": {
-          "completion_tokens": 150,
-          "prompt_tokens": 642,
-          "total_tokens": 792,
+          "completion_tokens": 148,
+          "prompt_tokens": 640,
+          "total_tokens": 788,
           "prompt_tokens_details": {
             "cached_tokens": 0
           }
         },
-        "latencyMs": 8418,
+        "latencyMs": 2025,
         "parsed": {
           "next": "Run `npm test -- --run tests/window/maxDistinct.test.ts`.",
           "rollback": "Rollback to commit `7b31c2a` (correct only for unique-user input).",
-          "uncertainty": "Unicode-normalized `user_id` might compare unequal; normalization outside contract, not confirmed bug.",
+          "uncertainty": "Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug.",
           "reconsider": "Reconsider if input guaranteed ≤1 event/user (not guaranteed).",
           "deadEnd": "Sort copy by `user_id` per right endpoint. Result: Correct but 18.4 s on 2,000,000 events. Why: Violates 2 s target."
         },
         "checks": {
           "next": true,
           "rollback": false,
-          "uncertainty": false,
+          "uncertainty": true,
           "reconsider": false,
           "deadEnd": false
         },
@@ -355,7 +355,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 7168,
+      "latencyMs": 6292,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -436,7 +436,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 2566,
+        "latencyMs": 1930,
         "parsed": {
           "next": "/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 3500 --shadow",
           "rollback": "set feature flag auth.session-read-v4=false; do not delete auth.session_v4 for 7 days",
@@ -461,25 +461,25 @@
       "split": "heldout",
       "sourceChars": 2010,
       "maxTokens": 670,
-      "text": "F: mTLS issuer rotation triggered by near-expiry alert.\nC: Old issuer fingerprint SHA256:4A:19:7C:EE; expires 2026-08-12T03:00:00Z.\nC: New issuer fingerprint SHA256:91:B0:2D:6F; stored at /etc/pki/mesh/issuer-next.pem.\nC: 43 legacy agents < v5.4.2 lack dual trust bundle support.\nX: Single-step bundle replacement on canary edge-07 caused 14.2% handshake failures (leaf chained only to old issuer); restore took 38 s.\nD: Trust rollout must precede identity rollout; single-step replacement forbidden.\nC: Reconsider single-step replacement only when zero agents < v5.4.2 remain.\nX: Proposal to disable certificate verification for five minutes rejected; forbidden even during rollback.\nD: Execution order: 1. Append new issuer (keep old); 2. Verify; 3. Issue dual-compatible leaves; 4. Verify; 5. Remove old issuer last.\nC: First command: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Do not remove `--check` on first run.\nO: Success gate after trust append: 10,000 synthetic handshakes, zero unknown_ca errors, p99 < 120 ms.\nU: 43 legacy agents may require restart; uncertain until test agent legacy-12 reconnects.\nR: Abort if unknown_ca > 0.1% or any node clock skew > 2 s.\nR: Rollback before leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak.\nR: Rollback after leaf issuance: re-add both issuers and reissue old-chain leaves; removing only new issuer strands new leaves.\nU: Maintenance approval SEC-144 permits restarts; firmware update permission uncertain.\nN: Execute `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Keep old issuer until metric mesh_old_chain_connections is zero for 24 consecutive hours.\nC: Reconsider old-issuer removal only after metric gate and SEC-144 confirmation.",
+      "text": "F: mTLS issuer rotation triggered by near-expiry alert.\nC: Old issuer fingerprint SHA256:4A:19:7C:EE; expires 2026-08-12T03:00:00Z.\nC: New issuer fingerprint SHA256:91:B0:2D:6F; stored at /etc/pki/mesh/issuer-next.pem.\nC: 43 legacy agents < v5.4.2 lack dual trust bundle support.\nX: Single-step bundle replacement on canary edge-07 caused 14.2% handshake failures (leaf chained only to old issuer); restore took 38 s.\nD: Trust rollout must precede identity rollout; single-step replacement forbidden.\nC: Reconsider single-step replacement only when zero agents < v5.4.2 remain.\nX: Proposal to disable certificate verification for five minutes rejected; forbidden even during rollback.\nD: Execution order: 1. Append new issuer (keep old); 2. Verify; 3. Issue dual-compatible leaves; 4. Verify; 5. Remove old issuer last.\nC: First command: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Do not remove `--check` on first run.\nO: Success gate after trust append: 10,000 synthetic handshakes, zero unknown_ca errors, p99 < 120 ms.\nU: 43 legacy agents may require restart; uncertain until test agent legacy-12 reconnects.\nR: Abort if unknown_ca > 0.1% or clock skew > 2 s.\nR: Rollback before leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak.\nR: Rollback after leaf issuance: re-add both issuers and reissue old-chain leaves; removing only new issuer strands new leaves.\nU: Maintenance approval SEC-144 permits restarts; firmware update permission uncertain.\nN: Execute `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Keep old issuer until metric mesh_old_chain_connections is zero for 24 consecutive hours.\nC: Reconsider old-issuer removal only after metric gate and SEC-144 confirmation.",
       "finishReason": "stop",
       "usage": {
-        "completion_tokens": 513,
+        "completion_tokens": 511,
         "prompt_tokens": 833,
-        "total_tokens": 1346,
+        "total_tokens": 1344,
         "prompt_tokens_details": {
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6070,
+      "latencyMs": 5640,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
-      "outputChars": 1778,
-      "thinkingReduction": 0.11542288557213931,
+      "outputChars": 1769,
+      "thinkingReduction": 0.11990049751243781,
       "originalSessionBytes": 2365,
-      "storedSessionBytes": 2152,
-      "wholeSessionReduction": 0.09006342494714592,
+      "storedSessionBytes": 2143,
+      "wholeSessionReduction": 0.09386892177589856,
       "exactRetention": {
         "retained": [
           "SHA256:4A:19:7C:EE",
@@ -540,13 +540,13 @@
         "finishReason": "stop",
         "usage": {
           "completion_tokens": 98,
-          "prompt_tokens": 610,
-          "total_tokens": 708,
+          "prompt_tokens": 608,
+          "total_tokens": 706,
           "prompt_tokens_details": {
             "cached_tokens": 0
           }
         },
-        "latencyMs": 6449,
+        "latencyMs": 1388,
         "parsed": {
           "next": "Execute `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`",
           "rollback": "restore /etc/pki/mesh/ca-bundle.pem.bak",
@@ -581,7 +581,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 7868,
+      "latencyMs": 6171,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -670,7 +670,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 6763,
+        "latencyMs": 1680,
         "parsed": {
           "next": "./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json",
           "rollback": "set ATLAS_PROFILE=q8; restart one replica at a time; q8 misses TTFT gate but is stable fallback",

@@ -6,10 +6,11 @@ import { performance } from "node:perf_hooks";
 const endpoint = process.env.COMPACTOR_BASE_URL ?? "http://127.0.0.1:7484/v1";
 const model = process.env.COMPACTOR_MODEL ?? "unsloth";
 const apiKey = process.env.COMPACTOR_API_KEY ?? "sk-placeholder";
-const ratios = (process.env.COMPACTION_RATIOS ?? "0.5,0.75").split(",").map(Number);
+const ratios = (process.env.COMPACTION_RATIOS ?? "1").split(",").map(Number);
 const maxTraceChars = Number(process.env.MAX_TRACE_CHARS ?? -1);
-const estimatedCharsPerToken = Number(process.env.ESTIMATED_CHARS_PER_TOKEN ?? 4);
-const slot = Number(process.env.COMPACTOR_SLOT ?? 1);
+const estimatedCharsPerToken = Number(process.env.ESTIMATED_CHARS_PER_TOKEN ?? 3);
+const configuredSlot = process.env.COMPACTOR_SLOT ?? "1";
+const slot = configuredSlot === "" ? undefined : Number(configuredSlot);
 const fixturePath = resolve(process.argv[2] ?? "benchmarks/prompt-comparison/traces.json");
 const outputPath = resolve(process.argv[3] ?? "benchmarks/prompt-comparison/latest-results.json");
 
@@ -59,7 +60,7 @@ const candidates = {
     targetFraction: 0.5,
   },
 };
-const selectedNames = new Set((process.env.COMPACTION_CANDIDATES ?? Object.keys(candidates).join(",")).split(","));
+const selectedNames = new Set((process.env.COMPACTION_CANDIDATES ?? "typed-surface-safe2-reconsider").split(","));
 
 function buildPrompt(candidate, source) {
   const target = candidate.targetFraction
@@ -79,7 +80,7 @@ async function request(messages, maxTokens) {
       max_tokens: maxTokens,
       temperature: 0.1,
       seed: 3407,
-      id_slot: slot,
+      ...(slot === undefined ? {} : { id_slot: slot }),
       cache_prompt: false,
       chat_template_kwargs: { enable_thinking: false },
       thinking_budget_tokens: 0,

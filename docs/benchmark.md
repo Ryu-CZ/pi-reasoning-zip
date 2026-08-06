@@ -2,16 +2,44 @@
 
 ## Environment
 
-The comparative run was performed on 2026-08-05 with:
+The comparative run was repeated on 2026-08-06 with:
 
 - Pi `0.83.0`;
 - local `Qwen3.6-27B-UD-Q4_K_XL.gguf` served as `unsloth` by llama.cpp;
-- a 73,728-token context and three unified-KV slots;
+- a 53,504-token context per slot and three unified-KV slots;
 - compaction pinned to slot 1, temperature `0.1`, seed `3407`, and model-side thinking disabled;
-- `thresholds.maxTraceChars: 2000` for this historical comparison; and
+- the production default `thresholds.maxTraceChars: -1` (disabled); and
 - the same exact source string for every prompt candidate.
 
 The previous five-task benchmark established fail-open behavior and exposed the old token-budget problem, but it did not compare prompts or test independent continuation. The results below supersede it for prompt selection.
+
+## Run locally
+
+Start any local server that exposes an OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions`, then run:
+
+```bash
+npm run benchmark
+```
+
+The defaults target `http://127.0.0.1:7484/v1` and model `unsloth`. Override them without editing files:
+
+```bash
+COMPACTOR_BASE_URL=http://127.0.0.1:8080/v1 \
+COMPACTOR_MODEL=Qwen3.6-27B \
+npm run benchmark
+```
+
+The runner verifies that the endpoint returns the requested model. When a llama.cpp `/slots` endpoint is available, it reports the topology and selects slot 1 when possible; other OpenAI-compatible servers can omit `/slots` and the benchmark then omits `id_slot`.
+
+Each run writes `default.json`, `ratios.json`, `heldout.json`, `summary.json`, and `summary.md` under a timestamped, gitignored `benchmarks/local-runs/` directory. Partial failures stay isolated there and never replace the checked-in evidence. The default ratio sweep is `0.38,0.62,1.0`; override it with `BENCHMARK_RATIOS`.
+
+After reviewing a complete local run, explicitly promote its three raw results to the checked-in reference paths with:
+
+```bash
+npm run benchmark -- --promote
+```
+
+Run `npm run benchmark -- --help` for all local overrides. Promotion does not update prose claims automatically; review the generated summary before documenting or committing new host-specific measurements.
 
 ## Sources and reproducibility
 
@@ -29,18 +57,11 @@ The traces are deliberately dense, hand-authored reasoning-state records rather 
 Run the selected prompt and its ratio sweep against the intended local endpoint:
 
 ```bash
-ESTIMATED_CHARS_PER_TOKEN=3 \
-MAX_TRACE_CHARS=2000 \
-COMPACTION_CANDIDATES=typed-surface-safe2-reconsider \
-COMPACTION_RATIOS=1 \
 node scripts/benchmark-prompts.mjs \
   benchmarks/prompt-comparison/traces.json \
   benchmarks/prompt-comparison/final-winner-results.json
 
-ESTIMATED_CHARS_PER_TOKEN=3 \
-MAX_TRACE_CHARS=2000 \
-COMPACTION_CANDIDATES=typed-surface-safe2-reconsider \
-COMPACTION_RATIOS=0.25,0.5,0.75 \
+COMPACTION_RATIOS=0.38,0.62,1.0 \
 node scripts/benchmark-prompts.mjs \
   benchmarks/prompt-comparison/traces.json \
   benchmarks/prompt-comparison/final-budget-sweep.json
@@ -49,10 +70,7 @@ node scripts/benchmark-prompts.mjs \
 Run the frozen blind comparison:
 
 ```bash
-ESTIMATED_CHARS_PER_TOKEN=3 \
-MAX_TRACE_CHARS=2000 \
 COMPACTION_CANDIDATES=typed,terse,surface,typed-surface-safe2-reconsider \
-COMPACTION_RATIOS=1 \
 node scripts/benchmark-prompts.mjs \
   benchmarks/prompt-comparison/heldout-traces.json \
   benchmarks/prompt-comparison/true-heldout-core-results.json
@@ -77,14 +95,14 @@ All figures below are from the three frozen held-out traces at ratio `1.0` with 
 
 | Candidate | Complete | Runtime accepted | Strict spans | Dead-end checks | Leakage canaries | Exact next action | Stored-thinking reduction | Mean latency |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Previous typed ledger | 3/3 | 0/3 | 75/75 | 8/9 | 2/3 | 3/3 | 0.0% | 12.55 s |
-| Plain terse control | 3/3 | 2/3 | 34/75 | 2/9 | 1/3 | 1/3 | 30.0% | 9.34 s |
-| Caveman-inspired surface policy | 3/3 | 3/3 | 68/75 | 6/9 | 3/3 | 2/3 | 22.5% | 6.40 s |
-| **Selected hybrid** | **3/3** | **2/3** | **75/75** | **9/9** | **0/3** | **3/3** | **14.4%** | **6.00 s** |
+| Previous typed ledger | 3/3 | 3/3 | 75/75 | 8/9 | 2/3 | 3/3 | 8.8% | 6.79 s |
+| Plain terse control | 3/3 | 2/3 | 34/75 | 2/9 | 1/3 | 1/3 | 30.0% | 3.68 s |
+| Caveman-inspired surface policy | 3/3 | 3/3 | 68/75 | 6/9 | 3/3 | 2/3 | 22.5% | 6.76 s |
+| **Selected hybrid** | **3/3** | **3/3** | **75/75** | **9/9** | **0/3** | **3/3** | **15.4%** | **6.14 s** |
 
 The plain terse control often returned `none`; its small storage figure is therefore not evidence for useful generic brevity. The surface candidate was shortest and always accepted, but it lost exact spans, emitted source canaries, and failed one independent next-action recovery. It was rejected despite the best compression.
 
-The previous typed prompt retained all required spans but produced 2,037–2,161 characters. All three outputs exceeded this comparison's independent 2,000-character storage limit, so that configuration would preserve every original. The selected hybrid produced complete responses for all three. Two outputs were accepted; the dense parser ledger was 2,201 characters and was correctly rejected without raising `maxTraceChars`.
+The previous typed prompt retained all required spans but was consistently longer than the selected hybrid. With the production size cap disabled, all complete outputs shorter than their sources were accepted. The selected hybrid completed and was accepted for all three traces, including the dense 2,170-character parser ledger.
 
 ## Budget calibration
 
@@ -92,28 +110,27 @@ The final prompt was swept over the six tuning traces using the production three
 
 | `maxCompactionRatio` | Complete responses | Runtime accepted |
 |---:|---:|---:|
-| `0.25` | 0/6 | 0/6 |
-| `0.50` | 0/6 | 0/6 |
-| `0.75` | 3/6 | 3/6 |
+| `0.38` | 0/6 | 0/6 |
+| `0.62` | 0/6 | 0/6 |
 | `1.00` | 6/6 | 6/6 |
 
-The old `C / 4` estimate and `0.75` default left every typed and surface-policy response truncated at the 0.75 setting. Dense paths, punctuation, and code tokenize above the common four-characters-per-token heuristic. Production now estimates `ceil(C / 3)` and defaults the ratio to `1.0`. This increases generation headroom, not accepted storage: output must still complete, be non-empty, and be strictly shorter than the source. This historical sweep also enabled a 2,000-character `maxTraceChars` guardrail; the current default is `-1` (disabled).
+Both lower golden-ratio-inspired settings (`0.38` and `0.62`) truncated all six responses. Dense paths, punctuation, and code need the headroom provided by the conservative `ceil(C / 3)` estimate and the production ratio `1.0`. This increases generation headroom, not accepted storage: output must still complete, be non-empty, and be strictly shorter than the source. The sweep used the production `maxTraceChars: -1` default, so the lower-ratio failures were caused by generation truncation rather than the optional storage guardrail.
 
 ## Retention and storage effect
 
 On the six tuning traces, the selected prompt completed and was accepted 6/6, retained 103/112 strict source spans and 15/16 direct dead-end evidence/rationale checks, emitted zero canaries, and recovered the exact next action 6/6. Manual source comparison found that the nine strict misses were surface normalization rather than changed values—such as `1,200 in` for `1,200 input tokens`—except for one corrected, no-longer-true guess (`v2.18.0`) that was omitted. All marked decision-relevant paths, commands, identifiers, and numeric values remained semantically intact, as did the reviewed negation/exception rules, uncertainties, failed-attempt rationales, stated reconsideration conditions, rollback/abort rules, open questions, causal ordering, and next actions. Corrected discarded values such as the wrong `v2.18.0` guess and wrong path spelling were not retained. No unsupported claim strengthening was found.
 
-The frozen held-out set retained 75/75 strict spans and all 9/9 direct dead-end evidence/rationale checks. Manual review likewise found no strengthened claim or lost negation, uncertainty, dead-end rationale, rollback rule, reconsideration rule, or next action. The rejected 2,201-character parser output also retained 23/23 spans and the correct continuation state; fail-open storage intentionally used its original source.
+The frozen held-out set retained 75/75 strict spans and all 9/9 direct dead-end evidence/rationale checks. Manual review likewise found no strengthened claim or lost negation, uncertainty, dead-end rationale, rollback rule, reconsideration rule, or next action. All three outputs passed runtime acceptance and independent continuation recovery.
 
 | Set | Source thinking | Stored thinking | Change | Canonical JSONL bytes | Change |
 |---|---:|---:|---:|---:|---:|
-| Tuning (6) | 12,687 chars | 9,612 chars | -24.2% | 14,817 -> 11,858 | -20.0% |
-| Frozen held-out (3) | 6,893 chars | 5,901 chars | -14.4% | 7,958 -> 6,998 | -12.1% |
-| **Combined (9)** | **19,580 chars** | **15,513 chars** | **-20.8%** | **22,775 -> 18,856** | **-17.2%** |
+| Tuning (6) | 12,687 chars | 9,637 chars | -24.0% | 14,817 -> 11,883 | -19.8% |
+| Frozen held-out (3) | 6,893 chars | 5,829 chars | -15.4% | 7,958 -> 6,958 | -12.6% |
+| **Combined (9)** | **19,580 chars** | **15,466 chars** | **-21.0%** | **22,775 -> 18,841** | **-17.3%** |
 
 The canonical JSONL projection serializes a fixed session header, user message, assistant thinking block, and final text, then substitutes only accepted thinking. It measures whole serialized test sessions, not provider billing or a natural multi-turn Pi workload.
 
-The nine selected-prompt compactions took 60.5 seconds total (6.7 seconds mean) on this host. Independent continuation probes were separate benchmark requests and are not included in that latency. Compaction delays message finalization; savings benefit later replayed turns.
+The nine selected-prompt compactions took 56.6 seconds total (6.3 seconds mean) on this host. Independent continuation probes were separate benchmark requests and are not included in that latency. Compaction delays message finalization; savings benefit later replayed turns.
 
 ## Live high-reasoning stress check
 
@@ -163,4 +180,4 @@ Raw intermediate rounds remain under `benchmarks/prompt-comparison/` so these di
 - Strict span matching is conservative about harmless wording and unit normalization. Direct dead-end checks cover specific failed-attempt evidence/rationale spans, while the continuation probe only gates exact next-action recovery; manual review remains necessary and is not blinded or independently replicated.
 - The continuation probe uses the same local model family and checks the exact next action. Its additional rollback/uncertainty/reconsideration fields are diagnostic, not the pass criterion, because several notes contain multiple valid rollback or reconsideration rules.
 - Leakage checks use one canary across several phrasings plus a short prompt-phrase list and manual review; they do not cover arbitrary adversarial inputs. The source remains untrusted and downstream models must still treat stored reasoning as data.
-- The historical comparisons and high-reasoning stress check explicitly used `maxTraceChars: 2000`. Dense but faithful outputs can fail open under such an enabled guardrail, as one high-reasoning result did at 2,418 characters; the current default is `-1` (disabled).
+- The current exact-source comparison uses the default `maxTraceChars: -1`. The earlier high-reasoning stress check explicitly used `maxTraceChars: 2000`; one dense but faithful 2,418-character output therefore failed open. That result remains historical and does not describe the current default.

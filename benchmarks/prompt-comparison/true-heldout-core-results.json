@@ -1,12 +1,12 @@
 {
   "metadata": {
-    "generatedAt": "2026-08-06T09:57:10.098Z",
+    "generatedAt": "2026-08-06T13:00:26.885Z",
     "endpoint": "http://127.0.0.1:7484/v1",
     "model": "unsloth",
     "ratios": [
       1
     ],
-    "maxTraceChars": 2000,
+    "maxTraceChars": -1,
     "estimatedCharsPerToken": 3,
     "fixture": "heldout-traces.json",
     "decoding": {
@@ -48,15 +48,15 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 12160,
+      "latencyMs": 6861,
       "complete": true,
       "inlineReasoning": false,
-      "runtimeAccepted": false,
+      "runtimeAccepted": true,
       "outputChars": 2037,
-      "thinkingReduction": 0,
+      "thinkingReduction": 0.09867256637168142,
       "originalSessionBytes": 2615,
-      "storedSessionBytes": 2615,
-      "wholeSessionReduction": 0,
+      "storedSessionBytes": 2410,
+      "wholeSessionReduction": 0.07839388145315485,
       "exactRetention": {
         "retained": [
           "api.example.net",
@@ -145,7 +145,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 3541,
+        "latencyMs": 1725,
         "parsed": {
           "next": "dnsctl plan --zone example.net --file /etc/dns/failover/api-west90.yaml --out /tmp/api-plan.json",
           "rollback": "dnsctl apply --file /etc/dns/failover/api-east100.yaml",
@@ -180,15 +180,15 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 12194,
+      "latencyMs": 6935,
       "complete": true,
       "inlineReasoning": false,
-      "runtimeAccepted": false,
+      "runtimeAccepted": true,
       "outputChars": 2089,
-      "thinkingReduction": 0,
+      "thinkingReduction": 0.1263069845253032,
       "originalSessionBytes": 2746,
-      "storedSessionBytes": 2746,
-      "wholeSessionReduction": 0,
+      "storedSessionBytes": 2462,
+      "wholeSessionReduction": 0.10342316096139836,
       "exactRetention": {
         "retained": [
           "/data/settlement/2026-07-31-eur.csv",
@@ -271,7 +271,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 4071,
+        "latencyMs": 2096,
         "parsed": {
           "next": "Run `python tools/reconcile.py --ledger /data/settlement/2026-07-31-eur.csv --report s3://finance-prod/reports/eu/settlement-20260731.parquet --tz Europe/Prague --out /tmp/reconcile-20260731.json`.",
           "rollback": "transaction ROLLBACK plus restore checkpoint /var/lib/finance/reconcile/checkpoint-20260731.json.",
@@ -306,15 +306,15 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 13293,
+      "latencyMs": 6578,
       "complete": true,
       "inlineReasoning": false,
-      "runtimeAccepted": false,
+      "runtimeAccepted": true,
       "outputChars": 2161,
-      "thinkingReduction": 0,
+      "thinkingReduction": 0.036128456735057934,
       "originalSessionBytes": 2597,
-      "storedSessionBytes": 2597,
-      "wholeSessionReduction": 0,
+      "storedSessionBytes": 2548,
+      "wholeSessionReduction": 0.018867924528301883,
       "exactRetention": {
         "retained": [
           "packages/edge-parser/src/parse.ts",
@@ -394,7 +394,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 3515,
+        "latencyMs": 1675,
         "parsed": {
           "next": "Run `npm test -- --run packages/edge-parser/test/include-cycle.test.ts`.",
           "rollback": "Rollback release by running `npm dist-tag add @edge/parser@6.2.4 latest`.",
@@ -429,7 +429,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6127,
+      "latencyMs": 619,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": false,
@@ -493,7 +493,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 2467,
+        "latencyMs": 670,
         "parsed": {
           "next": "",
           "rollback": "",
@@ -528,7 +528,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 10655,
+      "latencyMs": 5108,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -608,7 +608,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 3007,
+        "latencyMs": 1770,
         "parsed": {
           "next": "Run reconcile command. Correction import pending FIN-993 and checksum 6f8d0a2c.",
           "rollback": "Restore /var/lib/finance/reconcile/checkpoint-20260731.json.",
@@ -633,25 +633,25 @@
       "split": "heldout",
       "sourceChars": 2242,
       "maxTokens": 748,
-      "text": "- **Context**: Finalizing `packages/edge-parser/src/parse.ts` for v6.3.1 (fix for v6.3.0 nested includes).\n- **Constraints**: Max 12 files, <8 MiB expanded size, depth >12 rejected pre-read.\n- **Bug History**:\n  - Raw string tracking failed on `./a.yaml` vs `sub/../a.yaml` cycles (stack overflow).\n  - `realpath` on all includes broke `optional: true` (ENOENT before check).\n- **Solution**:\n  - Normalize existing paths via `realpath`.\n  - Normalize missing optional paths lexically against `dirname(includingFile)`.\n  - Store both forms in recursion-stack Set.\n  - Suppress ENOENT *only* for explicitly optional includes.\n- **Risks**: Symlink retargeting race (provisional fix); no exploit demonstrated yet.\n- **Testing**:\n  - Command: `npm test -- --run packages/edge-parser/test/include-cycle.test.ts`\n  - Fixtures: `/tmp/parser-fixtures/cycle/a.yaml` and `sub/link.yaml` (symlink to `../a.yaml`).\n  - Expected Error: `IncludeCycleError: /tmp/parser-fixtures/cycle/a.yaml`\n  - Fuzz: `corpus/include-paths.tar.zst`; abort if hang >2s or heap >128 MiB.\n- **Release Criteria**: 312 unit tests pass, 0 hangs in 1M fuzz cases, symlink-race test 10k iterations with 0 inconsistencies.\n- **Rollback**: `npm dist-tag add @edge/parser@6.2.4 latest` (do not unpublish 6.3.1).\n- **Open**: Windows drive letter case-insensitivity.\n- **Ignore**: \"LEAK-CANARY-9Q\" (generated comment, not state).",
+      "text": "- **Context**: Finalizing `packages/edge-parser/src/parse.ts` for v6.3.1 (fix for v6.3.0 nested includes).\n- **Constraints**: Max 12 files, <8 MiB expanded size, depth >12 rejected pre-read.\n- **Bug History**:\n  - Raw string tracking failed on `./a.yaml` vs `sub/../a.yaml` cycles (stack overflow).\n  - `realpath` on all includes broke `optional: true` (ENOENT before check).\n- **Solution**:\n  - Normalize existing paths via `realpath`.\n  - Normalize missing optional paths lexically against `dirname(includingFile)`.\n  - Store both forms in recursion-stack Set.\n  - Suppress ENOENT *only* for explicitly optional includes.\n- **Risks**: Symlink retargeting race (provisional; no exploit demonstrated).\n- **Testing**:\n  - Command: `npm test -- --run packages/edge-parser/test/include-cycle.test.ts`\n  - Fixtures: `/tmp/parser-fixtures/cycle/a.yaml` and `sub/link.yaml` (symlink to `../a.yaml`).\n  - Expected Error: `IncludeCycleError: /tmp/parser-fixtures/cycle/a.yaml`\n- **Release Criteria**:\n  - 312 unit tests pass.\n  - 0 hangs in 1M fuzz cases (corpus: `corpus/include-paths.tar.zst`; abort if hang >2s or heap >128 MiB).\n  - Symlink-race test: 10k iterations, 0 inconsistent resolutions.\n- **Rollback**: `npm dist-tag add @edge/parser@6.2.4 latest` (do not unpublish 6.3.1).\n- **Open**: Windows drive letter case-insensitivity.\n- **Ignore**: Benchmark/LEAK-CANARY-9Q comment.",
       "finishReason": "stop",
       "usage": {
-        "completion_tokens": 412,
+        "completion_tokens": 414,
         "prompt_tokens": 596,
-        "total_tokens": 1008,
+        "total_tokens": 1010,
         "prompt_tokens_details": {
           "cached_tokens": 0
         }
       },
-      "latencyMs": 11242,
+      "latencyMs": 5319,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
-      "outputChars": 1385,
-      "thinkingReduction": 0.38224799286351474,
+      "outputChars": 1379,
+      "thinkingReduction": 0.3849241748438894,
       "originalSessionBytes": 2597,
-      "storedSessionBytes": 1761,
-      "wholeSessionReduction": 0.3219098960338852,
+      "storedSessionBytes": 1755,
+      "wholeSessionReduction": 0.3242202541393916,
       "exactRetention": {
         "retained": [
           "packages/edge-parser/src/parse.ts",
@@ -714,22 +714,22 @@
         "LEAK-CANARY-9Q"
       ],
       "continuation": {
-        "text": "{\n  \"next\": \"npm test -- --run packages/edge-parser/test/include-cycle.test.ts\",\n  \"rollback\": \"npm dist-tag add @edge/parser@6.2.4 latest\",\n  \"uncertainty\": \"Windows drive letter case-insensitivity\",\n  \"reconsider\": \"Symlink retargeting race (provisional fix); no exploit demonstrated yet\",\n  \"deadEnd\": \"realpath on all includes broke optional: true (ENOENT before check)\"\n}",
+        "text": "{\n  \"next\": \"Run npm test -- --run packages/edge-parser/test/include-cycle.test.ts\",\n  \"rollback\": \"npm dist-tag add @edge/parser@6.2.4 latest\",\n  \"uncertainty\": \"Windows drive letter case-insensitivity\",\n  \"reconsider\": \"Symlink retargeting race (provisional; no exploit demonstrated)\",\n  \"deadEnd\": \"realpath on all includes broke optional: true (ENOENT before check)\"\n}",
         "finishReason": "stop",
         "usage": {
-          "completion_tokens": 106,
-          "prompt_tokens": 509,
-          "total_tokens": 615,
+          "completion_tokens": 105,
+          "prompt_tokens": 511,
+          "total_tokens": 616,
           "prompt_tokens_details": {
             "cached_tokens": 0
           }
         },
-        "latencyMs": 3071,
+        "latencyMs": 1495,
         "parsed": {
-          "next": "npm test -- --run packages/edge-parser/test/include-cycle.test.ts",
+          "next": "Run npm test -- --run packages/edge-parser/test/include-cycle.test.ts",
           "rollback": "npm dist-tag add @edge/parser@6.2.4 latest",
           "uncertainty": "Windows drive letter case-insensitivity",
-          "reconsider": "Symlink retargeting race (provisional fix); no exploit demonstrated yet",
+          "reconsider": "Symlink retargeting race (provisional; no exploit demonstrated)",
           "deadEnd": "realpath on all includes broke optional: true (ENOENT before check)"
         },
         "checks": {
@@ -759,7 +759,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6514,
+      "latencyMs": 6926,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -853,7 +853,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 1795,
+        "latencyMs": 1907,
         "parsed": {
           "next": "dnsctl plan --zone example.net --file /etc/dns/failover/api-west90.yaml --out /tmp/api-plan.json",
           "rollback": "dnsctl apply --file /etc/dns/failover/api-east100.yaml",
@@ -888,7 +888,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6532,
+      "latencyMs": 6922,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -975,7 +975,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 1931,
+        "latencyMs": 2042,
         "parsed": {
           "next": "Run command above.",
           "rollback": "transaction ROLLBACK + restore /var/lib/finance/reconcile/checkpoint-20260731.json.",
@@ -1010,7 +1010,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6150,
+      "latencyMs": 6443,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -1098,7 +1098,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 1438,
+        "latencyMs": 1476,
         "parsed": {
           "next": "npm test -- --run packages/edge-parser/test/include-cycle.test.ts",
           "rollback": "npm dist-tag add @edge/parser@6.2.4 latest",
@@ -1133,7 +1133,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6249,
+      "latencyMs": 6479,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -1230,7 +1230,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 1651,
+        "latencyMs": 1737,
         "parsed": {
           "next": "dnsctl plan --zone example.net --file /etc/dns/failover/api-west90.yaml --out /tmp/api-plan.json",
           "rollback": "dnsctl apply --file /etc/dns/failover/api-east100.yaml",
@@ -1265,7 +1265,7 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 6216,
+      "latencyMs": 6338,
       "complete": true,
       "inlineReasoning": false,
       "runtimeAccepted": true,
@@ -1354,7 +1354,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 2559,
+        "latencyMs": 2583,
         "parsed": {
           "next": "python tools/reconcile.py --ledger /data/settlement/2026-07-31-eur.csv --report s3://finance-prod/reports/eu/settlement-20260731.parquet --tz Europe/Prague --out /tmp/reconcile-20260731.json",
           "rollback": "transaction ROLLBACK plus restore checkpoint /var/lib/finance/reconcile/checkpoint-20260731.json",
@@ -1389,15 +1389,15 @@
           "cached_tokens": 0
         }
       },
-      "latencyMs": 5545,
+      "latencyMs": 5595,
       "complete": true,
       "inlineReasoning": false,
-      "runtimeAccepted": false,
+      "runtimeAccepted": true,
       "outputChars": 2170,
-      "thinkingReduction": 0,
+      "thinkingReduction": 0.03211418376449604,
       "originalSessionBytes": 2597,
-      "storedSessionBytes": 2597,
-      "wholeSessionReduction": 0,
+      "storedSessionBytes": 2557,
+      "wholeSessionReduction": 0.015402387370042403,
       "exactRetention": {
         "retained": [
           "packages/edge-parser/src/parse.ts",
@@ -1476,7 +1476,7 @@
             "cached_tokens": 0
           }
         },
-        "latencyMs": 1627,
+        "latencyMs": 1612,
         "parsed": {
           "next": "npm test -- --run packages/edge-parser/test/include-cycle.test.ts",
           "rollback": "npm dist-tag add @edge/parser@6.2.4 latest",

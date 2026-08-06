@@ -43,6 +43,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "benchmark": "node scripts/run-local-benchmarks.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm test && npm run build",

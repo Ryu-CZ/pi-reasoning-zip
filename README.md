@@ -44,16 +44,18 @@ A controlled prompt comparison on local `Qwen3.6-27B-UD-Q4_K_XL.gguf` used ident
 
 | Prompt on frozen held-out traces | Runtime accepted | Strict spans | Leakage canaries | Exact next action | Thinking reduction |
 |---|---:|---:|---:|---:|---:|
-| Previous typed ledger | 0/3 | 75/75 | 2/3 | 3/3 | 0.0% |
+| Previous typed ledger | 3/3 | 75/75 | 2/3 | 3/3 | 8.8% |
 | Plain terse control | 2/3 | 34/75 | 1/3 | 1/3 | 30.0% |
 | Caveman-inspired surface policy | 3/3 | 68/75 | 3/3 | 2/3 | 22.5% |
-| **Selected hybrid** | **2/3** | **75/75** | **0/3** | **3/3** | **14.4%** |
+| **Selected hybrid** | **3/3** | **75/75** | **0/3** | **3/3** | **15.4%** |
 
-The selected prompt was not the shortest. It won because it retained exact state and supported continuation without quoting source instructions; one faithful 2,201-character output failed open under the historical comparison's configured 2,000-character storage bound. Across six tuning plus three frozen held-out traces, accepted storage reduced thinking by 20.8% and canonical whole-session JSONL bytes by 17.2%.
+The selected prompt was not the shortest. It won because it retained exact state and supported continuation without quoting source instructions. With the production `maxTraceChars: -1` default, all nine tuning and frozen held-out outputs were accepted; together they reduced thinking by 21.0% and canonical whole-session JSONL bytes by 17.3%.
 
-The token budget now estimates one token per three source characters and defaults `maxCompactionRatio` to `1.0`. In the tuning sweep, ratios `0.25` and `0.5` completed 0/6, `0.75` completed 3/6, and `1.0` completed 6/6. Accepted storage must be shorter than the source; an optional positive `maxTraceChars` guardrail can impose an additional cap.
+The token budget now estimates one token per three source characters and defaults `maxCompactionRatio` to `1.0`. In the current-default tuning sweep, golden-ratio-inspired alternatives `0.38` and `0.62` completed 0/6, while `1.0` completed and was accepted 6/6. Accepted storage must be shorter than the source; an optional positive `maxTraceChars` guardrail can impose an additional cap.
 
 A separate two-run live high-reasoning check raised llama.cpp's main-model thinking budget to 8,192 tokens. It generated 58,425 characters across six traces; production acceptance stored 20,379 characters (**-65.1% pooled reduction**, **-66.3% mean per run**) and accepted 5/6 results. The rejected 2,418-character compact trace safely preserved its original under that experiment's explicitly configured 2,000-character cap. This is a small local stress test, not a general compression promise. See [Benchmark](docs/benchmark.md) for committed sources, commands, raw results, candidate failures, retention review, timing, high-reasoning setup, provenance, and limitations.
+
+To run the reproducible suite against your own local OpenAI-compatible model, use `npm run benchmark`. It checks the endpoint and model, uses production defaults, and writes timestamped results without replacing the checked-in reference artifacts. See [Run locally](docs/benchmark.md#run-locally) for endpoint overrides and optional promotion.
 
 ## Install
 

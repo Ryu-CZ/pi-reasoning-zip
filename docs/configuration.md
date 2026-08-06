@@ -138,7 +138,7 @@ estimatedInputTokens = ceil(C / 3)
 max_tokens = ceil(estimatedInputTokens * maxCompactionRatio)
 ```
 
-At the default `1`, an 8,000-character trace is estimated as 2,667 input tokens and receives `max_tokens: 2667`. The conservative `C / 3` conversion is still approximate, especially for code and non-English text. This field limits generation; it does not promise the result will use the whole budget or have that output ratio. The result must still be shorter than the source; it is also limited by `thresholds.maxTraceChars` when that optional guardrail is enabled. A response stopped by the token limit is rejected as truncated, preserving the original. In the comparative local benchmark, the selected prompt completed 0/6 tuning traces at `0.25` and `0.5`, 3/6 at `0.75`, and 6/6 at `1`. The previous `C / 4` estimate underbudgeted punctuation- and code-dense traces.
+At the default `1`, an 8,000-character trace is estimated as 2,667 input tokens and receives `max_tokens: 2667`. The conservative `C / 3` conversion is still approximate, especially for code and non-English text. This field limits generation; it does not promise the result will use the whole budget or have that output ratio. The result must still be shorter than the source; it is also limited by `thresholds.maxTraceChars` when that optional guardrail is enabled. A response stopped by the token limit is rejected as truncated, preserving the original. In the current-default comparative benchmark, the selected prompt completed 0/6 tuning traces at both `0.38` and `0.62`, and 6/6 at `1`. The previous `C / 4` estimate underbudgeted punctuation- and code-dense traces.
 
 ### `compactor.temperature`
 

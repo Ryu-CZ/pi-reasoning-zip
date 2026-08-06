@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+benchmarks/local-runs/
 
 # Build output
 dist/
