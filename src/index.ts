@@ -310,11 +310,11 @@ function scopeLabel(source: string): string {
 
 async function handleReasoningZipCommand(args: unknown, ctx: unknown): Promise<string> {
   const parts = typeof args === "string" ? args.trim().toLowerCase().split(/\s+/).filter(Boolean) : [];
-  const command = parts[0] || "status";
+  const command = parts[0] || "toggle";
   const requestedScope = parseScope(parts[1]) ?? parseScope(command);
   const cwd = cwdFromContext(ctx);
 
-  if (command === "" || command === "status" || requestedScope && parts.length === 1) {
+  if (command === "status" || requestedScope && parts.length === 1) {
     const setting = await inspectEnabledSetting(cwd, requestedScope);
     const path = setting.path ? ` (${setting.path})` : "";
     const message = `pi-reasoning-zip is ${enabledLabel(setting.value)} from ${scopeLabel(setting.source)}${path}.`;
@@ -392,7 +392,7 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
   const completedSlotProbes = new Map<string, { slotCount: number; expiresAt: number }>();
 
   extension.registerCommand?.("reasoning-zip", {
-    description: "Enable, disable, or inspect pi-reasoning-zip",
+    description: "Toggle pi-reasoning-zip on or off",
     handler: handleReasoningZipCommand,
   });
 

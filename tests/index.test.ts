@@ -79,6 +79,10 @@ describe("extension entrypoint", () => {
 
     expect(String(await command("status", ctx))).toContain("enabled from built-in default");
     expect(statuses["reasoning-zip"]).toBe("🗜️ Zip");
+    expect(String(await command("", ctx))).toContain("disabled (project settings:");
+    expect(statuses["reasoning-zip"]).toBeUndefined();
+    expect(String(await command(undefined, ctx))).toContain("enabled (project settings:");
+    expect(statuses["reasoning-zip"]).toBe("🗜️ Zip");
     expect(String(await command("disable", ctx))).toContain("disabled (project settings:");
     expect(statuses["reasoning-zip"]).toBeUndefined();
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Changed the bare `/reasoning-zip` command from a status display into a shortcut that toggles the extension on or off. Explicit `/reasoning-zip status` remains available.
+
 ## [0.6.1] - 2026-08-06
 
 ### Changed

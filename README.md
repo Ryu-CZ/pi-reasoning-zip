@@ -96,23 +96,24 @@ llama-server \
   --alias Qwen3.6-27B
 ```
 
-Enable the extension and inspect the effective toggle source:
+Toggle the extension and inspect the effective toggle source:
 
 ```text
-/reasoning-zip enable
+/reasoning-zip
 /reasoning-zip status
 ```
 
 ## Commands
 
 ```text
+/reasoning-zip
 /reasoning-zip status
 /reasoning-zip enable [global|project]
 /reasoning-zip disable [global|project]
 /reasoning-zip toggle [global|project]
 ```
 
-Without a scope, writes update the nearest existing `reasoningZip` settings section and otherwise use global settings. Settings are reread for each hook call, so toggles affect subsequent compaction. When enabled, Pi's footer shows the global `reasoningZip.footerStatus` value (`🗜️ Zip` by default).
+The bare `/reasoning-zip` command toggles the extension. Without a scope, writes update the nearest existing `reasoningZip` settings section and otherwise use global settings. Settings are reread for each hook call, so toggles affect subsequent compaction. When enabled, Pi's footer shows the global `reasoningZip.footerStatus` value (`🗜️ Zip` by default).
 
 ## Configuration
 

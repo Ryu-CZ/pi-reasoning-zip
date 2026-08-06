@@ -62,7 +62,7 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
 
 ### `enabled`
 
-Master on/off switch for the extension. It exists so `/reasoning-zip enable`, `disable`, and `toggle` can change behavior without destroying the rest of the configuration.
+Master on/off switch for the extension. The bare `/reasoning-zip` command toggles it; the `enable`, `disable`, and `toggle` subcommands can also change it without destroying the rest of the configuration.
 
 - `true`: allow targeting, compaction, and optional slot handling according to the other fields; show `footerStatus`.
 - `false`: do not target or compact messages and do not inject slot fields; clear the footer status.
