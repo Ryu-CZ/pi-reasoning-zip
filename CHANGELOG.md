@@ -7,31 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added compaction of eligible thinking in assistant messages that contain tool calls. Tool-call blocks remain unchanged.
+- Added `npm run benchmark` for running the reproducible suite against a local OpenAI-compatible model. Results are written to timestamped local directories and replace the checked-in reference artifacts only with `--promote`.
+
 ### Changed
 
-- Added a local-first `npm run benchmark` workflow with endpoint/model preflight, optional llama.cpp slot discovery, production-aligned defaults, timestamped non-destructive results, generated summaries, configurable ratio sweeps, and explicit reference-artifact promotion.
-- Replaced the fixed compactor token limit with `compactor.maxCompactionRatio`, which derives an output budget separately for each reasoning input.
-- Set the ratio default to `1` and changed the source-token estimate from one token per four characters to a conservative one per three after the comparative benchmark found lower budgets truncated state-dense traces; accepted storage remains shorter than its source.
-- Expanded the configuration reference with the purpose, exact behavior, accepted values, interactions, and failure semantics of every supported setting; `thresholds.maxTraceChars` now defaults to `-1` (disabled) and remains available as an opt-in positive guardrail.
-- Replaced the static `thresholds.maxInputChars` setting with automatic source sizing from llama.cpp model context metadata. `thresholds.fallbackMaxInputChars` is used only when the compactor endpoint cannot provide that metadata.
-- Replaced the old five-task prompt claims with a reproducible nine-trace local comparison covering development and frozen held-out sources, a terse control, Caveman-inspired and hybrid candidates, strict retention, injection canaries, independent next-action recovery, budget calibration, latency, fail-open storage, and whole-session effects. Repeated the exact-source comparison with production defaults and `0.38`/`0.62` ratio alternatives; added a separately labeled two-run, 8,192-token live-reasoning stress check with raw artifacts and fail-open accounting.
-- Split the README into a quick start with the full reference in `docs/` (`benchmark.md`, `configuration.md`, `llama-cpp-slot-pinning.md`) and added `CONTRIBUTING.md`.
-- Compact eligible thinking in tool-call messages while preserving tool-call blocks unchanged.
-- Reworked the compactor prompt into an evidence-selected hybrid: typed `F/C/D/X/U/R/O/N` state plus selective surface deletion, omission of instructions quoted inside source data, and retention of every source-stated reconsideration condition; its `none` escape hatch fires only when no useful state remains.
+- Replaced `compactor.maxTokens` with `compactor.maxCompactionRatio`, which derives an output budget for each reasoning input. The default ratio is `1`, using a conservative estimate of one token per three source characters. Existing configurations should remove `maxTokens` and set `maxCompactionRatio` only when overriding the default.
+- Changed `thresholds.maxTraceChars` from `2000` to `-1`, disabling the fixed output-size guardrail by default. Complete compacted reasoning that passes the other validation checks is no longer rejected solely for exceeding 2,000 characters; set a positive value to restore a fixed maximum.
+- Replaced `thresholds.maxInputChars` with automatic source sizing from the compactor model's llama.cpp context metadata. Use `thresholds.fallbackMaxInputChars` only for endpoints that do not report this metadata.
+- Reworked the compactor prompt to preserve decision-relevant state, failed-attempt rationale, reconsideration conditions, rollback information, uncertainties, and next actions while omitting instructions quoted inside source reasoning.
+- Expanded the configuration reference and reorganized the README as a quick start with detailed configuration, benchmark, and llama.cpp slot-pinning documentation under `docs/`.
+- Replaced the previous benchmark claims with reproducible exact-source retention and continuation checks using production defaults; retained the live high-reasoning results as a separately labeled, host-specific stress check.
 
 ### Removed
 
-- Removed the redundant `storageMode` setting and `mode: "disabled"`; use the established `enabled` switch as the single control for turning the extension off.
-- Removed the unvalidated `compressionRole` prompt-style presets and retained the established fragment-style compaction prompt directly.
-- Removed the `injectPrompt` setting and all main-model prompt mutation; `before_provider_request` now only manages optional llama.cpp slot isolation fields.
+- Removed `storageMode` and `mode: "disabled"`. Use `enabled` as the single control for turning the extension on or off.
+- Removed `compressionRole`; compaction now uses the built-in prompt described above.
+- Removed `injectPrompt`; the extension no longer changes the main model's system prompt or messages.
 
 ### Fixed
 
 - Isolated tests and the compiled smoke harness from the user's real global Pi settings so checks run deterministically on any machine.
 - Made llama.cpp auto-mode slot probes less fragile: two-second timeout with successful topology results cached for five seconds.
-- Leave provider requests untouched when their payload model differs from Pi's current context model, avoiding unsafe provider attribution.
-- Clear request-bound slot state when Pi aborts a provider request, and replace stale state when a later request has a different request signal.
-- Normalize all trailing slashes from the configured compactor base URL.
+- Left provider requests untouched when their payload model differs from Pi's current context model, avoiding unsafe provider attribution.
+- Cleared request-bound slot state when Pi aborts a provider request, and replaced stale state when a later request has a different request signal.
+- Normalized all trailing slashes from the configured compactor base URL.
 
 ## [0.5.0] - 2026-07-31
 
