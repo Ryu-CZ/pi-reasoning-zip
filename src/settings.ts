@@ -16,14 +16,14 @@ export const DEFAULT_SETTINGS: ReasoningZipSettings = {
     baseUrl: "http://127.0.0.1:7484/v1",
     model: "unsloth",
     apiKey: "sk-placeholder",
-    maxCompactionRatio: 0.75,
+    maxCompactionRatio: 1,
     temperature: 0.1,
     timeoutMs: 30000,
   },
   thresholds: {
     minChars: 1000,
-    maxInputChars: 50000,
-    maxTraceChars: 2000,
+    fallbackMaxInputChars: 50000,
+    maxTraceChars: -1,
   },
 };
 
@@ -152,8 +152,10 @@ export function resolveReasoningZipSettings(input: unknown): ReasoningZipSetting
     },
     thresholds: {
       minChars: numberValue(thresholds.minChars, DEFAULT_SETTINGS.thresholds.minChars, 0),
-      maxInputChars: numberValue(thresholds.maxInputChars, DEFAULT_SETTINGS.thresholds.maxInputChars, 1),
-      maxTraceChars: numberValue(thresholds.maxTraceChars, DEFAULT_SETTINGS.thresholds.maxTraceChars, 1),
+      fallbackMaxInputChars: numberValue(thresholds.fallbackMaxInputChars, DEFAULT_SETTINGS.thresholds.fallbackMaxInputChars, 1),
+      maxTraceChars: thresholds.maxTraceChars === -1
+        ? -1
+        : numberValue(thresholds.maxTraceChars, DEFAULT_SETTINGS.thresholds.maxTraceChars, 1),
     },
   };
 }

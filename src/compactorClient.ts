@@ -1,8 +1,12 @@
 import { buildCompactionPrompt } from "./compactPrompt.js";
 import type { ReasoningZipSettings } from "./types.js";
 
+const CONTEXT_CACHE_TTL_MS = 5 * 60_000;
+const PROMPT_RESERVE_TOKENS = 1024;
+const contextCache = new Map<string, { contextTokens?: number; expiresAt: number }>();
+
 function outputTokenBudget(thinking: string, settings: ReasoningZipSettings): number {
-  const estimatedInputTokens = Math.ceil(thinking.length / 4);
+  const estimatedInputTokens = Math.ceil(thinking.length / 3);
   return Math.ceil(estimatedInputTokens * settings.compactor.maxCompactionRatio);
 }
 
@@ -37,6 +41,41 @@ function buildPayload(thinking: string, settings: ReasoningZipSettings, disableT
   return payload;
 }
 
+function contextCacheKey(settings: ReasoningZipSettings): string {
+  return `${settings.compactor.baseUrl}\n${settings.compactor.model}`;
+}
+
+async function inputCharacterLimit(settings: ReasoningZipSettings, signal: AbortSignal): Promise<number> {
+  const key = contextCacheKey(settings);
+  const cached = contextCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.contextTokens === undefined
+      ? settings.thresholds.fallbackMaxInputChars
+      : Math.max(1, Math.floor((cached.contextTokens - PROMPT_RESERVE_TOKENS) / (1 + settings.compactor.maxCompactionRatio)) * 3);
+  }
+
+  let contextTokens: number | undefined;
+  try {
+    const response = await fetch(`${settings.compactor.baseUrl}/models`, {
+      headers: { authorization: `Bearer ${settings.compactor.apiKey}` },
+      signal,
+    });
+    if (response.ok) {
+      const json = await response.json() as { data?: Array<{ id?: unknown; meta?: { n_ctx?: unknown } }> };
+      const model = json.data?.find((entry) => entry.id === settings.compactor.model);
+      const nCtx = model?.meta?.n_ctx;
+      if (typeof nCtx === "number" && Number.isFinite(nCtx) && nCtx > PROMPT_RESERVE_TOKENS) contextTokens = nCtx;
+    }
+  } catch {
+    if (signal.aborted) throw new Error("Compactor context discovery aborted");
+  }
+
+  contextCache.set(key, { contextTokens, expiresAt: Date.now() + CONTEXT_CACHE_TTL_MS });
+  return contextTokens === undefined
+    ? settings.thresholds.fallbackMaxInputChars
+    : Math.max(1, Math.floor((contextTokens - PROMPT_RESERVE_TOKENS) / (1 + settings.compactor.maxCompactionRatio)) * 3);
+}
+
 async function postCompactionRequest(
   thinking: string,
   settings: ReasoningZipSettings,
@@ -54,10 +93,11 @@ async function postCompactionRequest(
   });
 }
 
-export async function compactWithOpenAI(thinking: string, settings: ReasoningZipSettings): Promise<string> {
+export async function compactWithOpenAI(thinking: string, settings: ReasoningZipSettings): Promise<string | undefined> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), settings.compactor.timeoutMs);
   try {
+    if (thinking.length > await inputCharacterLimit(settings, controller.signal)) return undefined;
     let response = await postCompactionRequest(thinking, settings, controller.signal, true);
 
     // Some strict OpenAI-compatible endpoints reject llama.cpp-specific

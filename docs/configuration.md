@@ -17,12 +17,12 @@ The extension rereads settings for every relevant hook. Global values are merged
 | `compactor.baseUrl` | string | `http://127.0.0.1:7484/v1` | OpenAI-compatible API base URL; trailing slashes are removed. |
 | `compactor.model` | string | `unsloth` | Model sent in compactor requests. |
 | `compactor.apiKey` | string | `sk-placeholder` | Bearer token for compactor requests and `/slots` probes. |
-| `compactor.maxCompactionRatio` | fraction greater than 0 and at most 1 | `0.75` | Sets the maximum per-input output budget using estimated input tokens. |
+| `compactor.maxCompactionRatio` | fraction greater than 0 and at most 1 | `1` | Sets the maximum per-input output budget using estimated input tokens. |
 | `compactor.temperature` | non-negative number | `0.1` | Compactor sampling temperature. |
 | `compactor.timeoutMs` | number, at least 1 | `30000` | Compactor request timeout in milliseconds. |
 | `thresholds.minChars` | non-negative number | `1000` | Minimum reasoning-block length eligible for compaction. |
-| `thresholds.maxInputChars` | number, at least 1 | `50000` | Maximum reasoning-block length eligible for compaction. |
-| `thresholds.maxTraceChars` | number, at least 1 | `2000` | Maximum accepted compact reasoning length. |
+| `thresholds.fallbackMaxInputChars` | number, at least 1 | `50000` | Source-character limit only when compactor context metadata is unavailable. |
+| `thresholds.maxTraceChars` | `-1` or number at least 1 | `-1` | Optional maximum accepted compact reasoning length; `-1` disables this guardrail. |
 
 Invalid enum values and values outside the accepted type or numeric range fall back to their built-in defaults.
 
@@ -45,14 +45,14 @@ This recommended shared llama.cpp-server example is not a dump of built-in defau
       "baseUrl": "http://127.0.0.1:8080/v1",
       "model": "Qwen3.6-27B",
       "apiKey": "sk-placeholder",
-      "maxCompactionRatio": 0.75,
+      "maxCompactionRatio": 1,
       "temperature": 0.1,
       "timeoutMs": 30000
     },
     "thresholds": {
       "minChars": 1000,
-      "maxInputChars": 50000,
-      "maxTraceChars": 2000
+      "fallbackMaxInputChars": 50000,
+      "maxTraceChars": -1
     }
   }
 }
@@ -134,11 +134,11 @@ Maximum generated-output budget as a fraction of the estimated source reasoning 
 The accepted range is greater than `0` and at most `1`. For a thinking block whose JavaScript string `.length` is `C`, the request uses:
 
 ```text
-estimatedInputTokens = ceil(C / 4)
+estimatedInputTokens = ceil(C / 3)
 max_tokens = ceil(estimatedInputTokens * maxCompactionRatio)
 ```
 
-At the default `0.75`, an 8,000-character trace is estimated as 2,000 input tokens and receives `max_tokens: 1500`. The `C / 4` conversion is approximate, especially for code and non-English text. This field limits generation; it does not promise the result will be that ratio, and the result must still be shorter than the source and no longer than `thresholds.maxTraceChars`. A response stopped by the token limit is rejected as truncated, preserving the original. The default deliberately leaves generation headroom: the local benchmark found that `0.25` and `0.5` truncated every tested lossless-ledger response.
+At the default `1`, an 8,000-character trace is estimated as 2,667 input tokens and receives `max_tokens: 2667`. The conservative `C / 3` conversion is still approximate, especially for code and non-English text. This field limits generation; it does not promise the result will use the whole budget or have that output ratio. The result must still be shorter than the source; it is also limited by `thresholds.maxTraceChars` when that optional guardrail is enabled. A response stopped by the token limit is rejected as truncated, preserving the original. In the comparative local benchmark, the selected prompt completed 0/6 tuning traces at `0.25` and `0.5`, 3/6 at `0.75`, and 6/6 at `1`. The previous `C / 4` estimate underbudgeted punctuation- and code-dense traces.
 
 ### `compactor.temperature`
 
@@ -158,17 +158,24 @@ Minimum source thinking-block length, measured by JavaScript string `.length` (U
 
 The comparison is inclusive: a block exactly `minChars` long is eligible. `0` permits empty-length candidates in principle, although empty or non-useful compactions still fail validation. This threshold is evaluated independently for every thinking block in a message.
 
-### `thresholds.maxInputChars`
+### `thresholds.fallbackMaxInputChars`
 
-Maximum source thinking-block length, measured by JavaScript string `.length` (UTF-16 code units), that may be sent to the compactor. It exists to bound request size, latency, and compactor context consumption. The comparison is inclusive.
+Fallback maximum source thinking-block length, measured by JavaScript string `.length` (UTF-16 code units). It applies only when the configured compactor endpoint cannot report the selected model's context through `GET {baseUrl}/models` as `data[].meta.n_ctx`. The default is 50,000 characters.
 
-A longer block is skipped and retained unchanged; it is not truncated. Set this high enough for expected reasoning traces but within the compactor model's practical context window, including the compaction instructions.
+When metadata is available, the extension calculates the source limit instead:
+
+```text
+sourceTokenLimit = floor((contextTokens - 1024) / (1 + maxCompactionRatio))
+sourceCharacterLimit = sourceTokenLimit * 3
+```
+
+This reserves 1,024 tokens for compaction instructions and accounts for the ratio-derived output budget. At a 53,504-token context and ratio `1`, it permits 78,720 source characters. The discovered context (including an unavailable result) is cached for five minutes per compactor URL and model. If metadata is missing or the probe fails, the positive fallback limit prevents an unbounded request. A source over the applicable limit is skipped and retained unchanged; it is not truncated.
 
 ### `thresholds.maxTraceChars`
 
-Maximum accepted compacted output length, measured by JavaScript string `.length` (UTF-16 code units). It exists as a storage-size safety bound independent of the request's token budget.
+Optional maximum accepted compacted-output length, measured by JavaScript string `.length` (UTF-16 code units). The default `-1` disables this guardrail, so a valid compact result is stored whenever it is strictly shorter than its source. Set a positive value to impose an additional storage-size bound independent of the request's token budget.
 
-An output exceeding this value is rejected and the original reasoning remains. The output must also be non-empty, not exactly `none`, and strictly shorter than its source. This is an acceptance check after generation, not an instruction to the model and not a token limit; choose a value consistent with `maxCompactionRatio` and the content's character-to-token density.
+With a positive value, an output exceeding it is rejected and the original reasoning remains. In either mode, the output must be non-empty, not exactly `none`, complete, free of inline reasoning wrappers, and strictly shorter than its source. This is an acceptance check after generation, not an instruction to the model and not a token limit; choose a positive value only when you want that trade-off.
 
 ## Compactor endpoint
 
@@ -193,12 +200,28 @@ O: open question or success test
 N: next action
 ```
 
-The prompt treats dead ends as durable state: a rejected option is not reduced to “failed,” because its evidence, cannot-use conclusion, and reconsideration condition prevent a later agent from repeating the same work. It asks the compactor to remove only repetition, self-talk, and grammar while retaining exact strings, values, units, causal order, and every alternative. If no useful state remains, `none` causes the original reasoning to remain unchanged; the compactor is also told never to include the prompt's own instruction text in its output.
+The prompt treats dead ends as durable state: a rejected option is not reduced to “failed,” because its evidence, cannot-use conclusion, and source-stated reconsideration condition prevent a later agent from repeating the same work. It combines the typed ledger with selective surface deletion, while retaining exact strings, values, units, causal order, and alternatives. Instructions quoted or described inside the source are omitted rather than followed or repeated. If no useful state remains, `none` causes the original reasoning to remain unchanged; the compactor is also told never to include the prompt's own instruction text in its output.
 
-The extension preserves the original reasoning if the request fails or the response is empty, `none`, contains inline reasoning wrappers, is truncated, is not shorter than the original, or exceeds `thresholds.maxTraceChars`.
+The extension preserves the original reasoning if the request fails or the response is empty, `none`, contains inline reasoning wrappers, is truncated, or is not shorter than the original. It also preserves the original when an enabled positive `thresholds.maxTraceChars` guardrail is exceeded.
 
 ## Tuning guidance
 
-The benchmark used `minChars: 400` to test aggressive coverage; that is not the built-in default. It compacted short traces but required two extra requests to save 243 characters across the two shortest tasks, and one result lost secondary context. See [Benchmark](benchmark.md).
+The prompt comparison used traces around 2,000 characters and direct exact-source requests. It did not establish that shorter traces are worth the added request, so the built-in `minChars: 1000` remains unchanged. See [Benchmark](benchmark.md).
 
-Tune `minChars` first to decide which traces are worth compacting. Then choose `maxCompactionRatio` for generation headroom and `maxTraceChars` for the largest result you are willing to store. Keep `maxInputChars` within the compactor model's context capacity. Measure retention on exact source traces: independent live generations vary and are not a controlled compression comparison.
+Tune `minChars` first to decide which traces are worth compacting. Then choose `maxCompactionRatio` for generation headroom and optionally enable a positive `maxTraceChars` guardrail when you want a fixed largest stored result. The automatic source limit uses compactor context metadata when available; choose `fallbackMaxInputChars` for endpoints that do not provide it. Measure retention on exact source traces: independent live generations vary and are not a controlled compression comparison.
+
+## Longer main-model reasoning (llama.cpp)
+
+This extension does not make the main model reason longer. For a llama.cpp/Qwen benchmark, configure the **main server**, not the compactor, with reasoning enabled and an explicit finite thinking budget, for example:
+
+```bash
+llama-server \
+  --reasoning on \
+  --reasoning-preserve \
+  --reasoning-budget 8192 \
+  --parallel 3 --kv-unified --slots
+```
+
+`--reasoning-budget` caps hidden reasoning tokens; it is independent of this extension's `compactor.maxCompactionRatio`. If Pi or its llama.cpp integration sends `thinking_budget_tokens`, use a matching or lower main-request budget (the live stress check used `8192`) and keep the compactor at `thinking_budget_tokens: 0`. When using shared slots, pin main traffic to slot 0 and compaction to slot 1.
+
+Longer source reasoning can exceed the automatically derived source limit (or `fallbackMaxInputChars` when context metadata is unavailable), in which case the extension skips it and preserves the original. With a positive `maxTraceChars` guardrail, it can also produce a faithful compact result longer than that value, in which case validation rejects it and preserves the original. Do not enable or raise either threshold merely to improve a benchmark headline; choose them only after evaluating the latency, storage, and retention trade-off. The two-run 8,192-token local stress check and its raw output are documented in [Benchmark](benchmark.md#live-high-reasoning-stress-check).

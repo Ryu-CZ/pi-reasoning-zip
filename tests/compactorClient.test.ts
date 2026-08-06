@@ -4,6 +4,11 @@ import { resolveReasoningZipSettings } from "../src/settings.js";
 
 const settings = resolveReasoningZipSettings({ compactor: { baseUrl: "http://local.test/v1", model: "zip", apiKey: "key", timeoutMs: 1000 } });
 
+function chatCall(fetchMock: ReturnType<typeof vi.spyOn>, index = 0): [string, RequestInit] {
+  const call = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/chat/completions"))[index];
+  return [String(call?.[0]), call?.[1] as RequestInit];
+}
+
 describe("compactWithOpenAI", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -16,7 +21,7 @@ describe("compactWithOpenAI", () => {
     } as Response);
 
     await expect(compactWithOpenAI("original thinking", settings)).resolves.toBe("facts:\n- a");
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = chatCall(fetchMock);
     expect(url).toBe("http://local.test/v1/chat/completions");
     expect((init as RequestInit).method).toBe("POST");
     expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer key" });
@@ -28,7 +33,7 @@ describe("compactWithOpenAI", () => {
     expect(body.messages[0].content).toBe("You compress reasoning traces. Output only compact trace.");
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
     expect(body.thinking_budget_tokens).toBe(0);
-    expect(body.max_tokens).toBe(4);
+    expect(body.max_tokens).toBe(6);
   });
 
   it("sizes the output budget from the estimated input tokens", async () => {
@@ -42,8 +47,52 @@ describe("compactWithOpenAI", () => {
 
     await compactWithOpenAI("x".repeat(8000), dynamicSettings);
 
+    const [, init] = chatCall(fetchMock);
+    const body = JSON.parse(init.body as string);
+    expect(body.max_tokens).toBe(667);
+  });
+
+  it("uses llama.cpp model context to skip oversized source reasoning", async () => {
+    const dynamicSettings = resolveReasoningZipSettings({
+      compactor: { baseUrl: "http://context.test/v1", model: "context-model" },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "context-model", meta: { n_ctx: 53504 } }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("x".repeat(78721), dynamicSettings)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://context.test/v1/models");
+  });
+
+  it("uses fallbackMaxInputChars when the endpoint omits model context", async () => {
+    const dynamicSettings = resolveReasoningZipSettings({
+      compactor: { baseUrl: "http://fallback.test/v1", model: "fallback-model" },
+      thresholds: { fallbackMaxInputChars: 100 },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: "fallback-model" }] }),
+    } as Response);
+
+    await expect(compactWithOpenAI("x".repeat(101), dynamicSettings)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rounds estimated input tokens before applying the compaction ratio", async () => {
+    const dynamicSettings = resolveReasoningZipSettings({
+      compactor: { baseUrl: "http://local.test/v1", maxCompactionRatio: 0.75 },
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "compact" }, finish_reason: "stop" }] }),
+    } as Response);
+
+    await compactWithOpenAI("x".repeat(1591), dynamicSettings);
+
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
-    expect(body.max_tokens).toBe(500);
+    expect(body.max_tokens).toBe(399); // ceil(ceil(1591 / 3) * 0.75)
   });
 
   it("pins compactor requests to the configured llama.cpp slot", async () => {

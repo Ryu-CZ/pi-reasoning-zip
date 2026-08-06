@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Replaced the fixed compactor token limit with `compactor.maxCompactionRatio`, which derives an output budget separately for each reasoning input.
-- Set the ratio default to `0.75` after a fresh five-task benchmark found that `0.25` through `0.5` truncated every lossless-ledger response; completed output must still pass the shorter-than-source acceptance check.
-- Expanded the configuration reference with the purpose, exact behavior, accepted values, interactions, and failure semantics of every supported setting.
-- Replaced the outdated local results with a fresh isolated Pi `0.83.0` five-task benchmark covering ratio calibration, exact-source compression, retention, timing, fail-open behavior, and live slot routing.
+- Set the ratio default to `1` and changed the source-token estimate from one token per four characters to a conservative one per three after the comparative benchmark found lower budgets truncated state-dense traces; accepted storage remains shorter than its source.
+- Expanded the configuration reference with the purpose, exact behavior, accepted values, interactions, and failure semantics of every supported setting; `thresholds.maxTraceChars` now defaults to `-1` (disabled) and remains available as an opt-in positive guardrail.
+- Replaced the static `thresholds.maxInputChars` setting with automatic source sizing from llama.cpp model context metadata. `thresholds.fallbackMaxInputChars` is used only when the compactor endpoint cannot provide that metadata.
+- Replaced the old five-task prompt claims with a reproducible nine-trace local comparison covering development and frozen held-out sources, a terse control, Caveman-inspired and hybrid candidates, strict retention, injection canaries, independent next-action recovery, budget calibration, latency, fail-open storage, and whole-session effects; added a separately labeled two-run, 8,192-token live-reasoning stress check with raw artifacts and fail-open accounting.
 - Split the README into a quick start with the full reference in `docs/` (`benchmark.md`, `configuration.md`, `llama-cpp-slot-pinning.md`) and added `CONTRIBUTING.md`.
 - Compact eligible thinking in tool-call messages while preserving tool-call blocks unchanged.
-- Reworked the compactor prompt into a lossless state ledger (typed `F/C/D/X/U/R/O/N` buckets) that copies exact values, keeps causal order and complete dead-end rationale, and never emits its own instruction text; its `none` escape hatch now fires only when no useful state remains.
+- Reworked the compactor prompt into an evidence-selected hybrid: typed `F/C/D/X/U/R/O/N` state plus selective surface deletion, omission of instructions quoted inside source data, and retention of every source-stated reconsideration condition; its `none` escape hatch fires only when no useful state remains.
 
 ### Removed
 

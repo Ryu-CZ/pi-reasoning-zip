@@ -6,20 +6,28 @@ describe("resolveReasoningZipSettings", () => {
     const settings = resolveReasoningZipSettings(undefined);
     expect(settings.mode).toBe("local-only");
     expect(settings.compactor.baseUrl).toBe("http://127.0.0.1:7484/v1");
-    expect(settings.compactor.maxCompactionRatio).toBe(0.75);
+    expect(settings.compactor.maxCompactionRatio).toBe(1);
     expect(settings.llamaCppSlots).toEqual({ enabled: false, mainIdSlot: 0, compactorIdSlot: 1 });
-    expect(settings.thresholds.maxInputChars).toBe(50000);
+    expect(settings.thresholds.fallbackMaxInputChars).toBe(50000);
+    expect(settings.thresholds.maxTraceChars).toBe(-1);
     expect(settings.footerStatus).toBe("🗜️ Zip");
   });
 
   it("merges partial config", () => {
-    const settings = resolveReasoningZipSettings({ mode: "all", footerStatus: "Zip On", llamaCppSlots: { enabled: true, mainIdSlot: 2, compactorIdSlot: 3 }, compactor: { model: "zipper" }, thresholds: { minChars: 10, maxInputChars: 20000 } });
+    const settings = resolveReasoningZipSettings({ mode: "all", footerStatus: "Zip On", llamaCppSlots: { enabled: true, mainIdSlot: 2, compactorIdSlot: 3 }, compactor: { model: "zipper" }, thresholds: { minChars: 10, fallbackMaxInputChars: 20000 } });
     expect(settings.mode).toBe("all");
     expect(settings.compactor.model).toBe("zipper");
     expect(settings.llamaCppSlots).toEqual({ enabled: true, mainIdSlot: 2, compactorIdSlot: 3 });
     expect(settings.thresholds.minChars).toBe(10);
-    expect(settings.thresholds.maxInputChars).toBe(20000);
+    expect(settings.thresholds.fallbackMaxInputChars).toBe(20000);
     expect(settings.footerStatus).toBe("Zip On");
+  });
+
+  it("accepts -1 to disable the compact-output size cap", () => {
+    expect(resolveReasoningZipSettings({ thresholds: { maxTraceChars: -1 } }).thresholds.maxTraceChars).toBe(-1);
+    expect(resolveReasoningZipSettings({ thresholds: { maxTraceChars: 2000 } }).thresholds.maxTraceChars).toBe(2000);
+    expect(resolveReasoningZipSettings({ thresholds: { maxTraceChars: 0 } }).thresholds.maxTraceChars).toBe(-1);
+    expect(resolveReasoningZipSettings({ thresholds: { maxTraceChars: -2 } }).thresholds.maxTraceChars).toBe(-1);
   });
 
   it("accepts auto slot mode and falls back for invalid enums", () => {
@@ -39,8 +47,8 @@ describe("resolveReasoningZipSettings", () => {
   it("accepts a maximum compaction ratio and falls back for invalid fractions", () => {
     expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0.5 } }).compactor.maxCompactionRatio).toBe(0.5);
 
-    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(0.75);
-    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(0.75);
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 0 } }).compactor.maxCompactionRatio).toBe(1);
+    expect(resolveReasoningZipSettings({ compactor: { maxCompactionRatio: 1.1 } }).compactor.maxCompactionRatio).toBe(1);
   });
 
   it("ignores removed development settings", () => {

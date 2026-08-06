@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "generatedAt": "2026-08-06T11:40:40.113Z",
+    "sourceRuns": [
+      "run-1.json",
+      "run-2.json"
+    ],
+    "methodology": "Two sequential end-to-end runs: generation on llama.cpp slot 0 with thinking_budget_tokens=8192 and max_tokens=10000; selected production compactor on slot 1 with thinking disabled, C/3 token estimate, ratio 1, and unchanged maxTraceChars=2000.",
+    "interpretation": "storedChars uses the original reasoning when runtime acceptance rejects an output, exactly as production fail-open behavior does. Marker rates only assess task markers that appeared in the generated reasoning source; they are not a complete semantic-retention audit."
+  },
+  "runSummaries": [
+    {
+      "name": "run-1",
+      "traces": 3,
+      "sourceChars": 27106,
+      "storedChars": 4647,
+      "thinkingReduction": 0.8285619420054601,
+      "runtimeAccepted": "3/3",
+      "generatedReasoningCharsMean": 9035.333333333334,
+      "generationLatencyMsMean": 35932,
+      "compactionLatencyMsMean": 6252.333333333333,
+      "sourcePresentMarkers": "15/17"
+    },
+    {
+      "name": "run-2",
+      "traces": 3,
+      "sourceChars": 31319,
+      "storedChars": 15732,
+      "thinkingReduction": 0.49768511127430637,
+      "runtimeAccepted": "2/3",
+      "generatedReasoningCharsMean": 10439.666666666666,
+      "generationLatencyMsMean": 39444,
+      "compactionLatencyMsMean": 6319.666666666667,
+      "sourcePresentMarkers": "14/17"
+    }
+  ],
+  "meanPerRun": {
+    "thinkingReduction": 0.6631235266398832
+  },
+  "pooled": {
+    "traces": 6,
+    "sourceChars": 58425,
+    "storedChars": 20379,
+    "thinkingReduction": 0.651193838254172,
+    "runtimeAccepted": "5/6",
+    "generatedReasoningCharsMean": 9737.5,
+    "generationLatencyMsMean": 37688,
+    "compactionLatencyMsMean": 6286,
+    "sourcePresentMarkers": "29/34"
+  }
+}

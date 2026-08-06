@@ -1,0 +1,2018 @@
+{
+  "metadata": {
+    "generatedAt": "2026-08-05T22:41:52.312Z",
+    "endpoint": "http://127.0.0.1:7484/v1",
+    "model": "unsloth",
+    "ratios": [
+      1
+    ],
+    "maxTraceChars": 2000,
+    "fixture": "traces.json",
+    "decoding": {
+      "temperature": 0.1,
+      "seed": 3407,
+      "slot": 1,
+      "thinkingDisabled": true
+    },
+    "candidates": {
+      "typed": "Lossless-state ledger; terse bullets. Group related values: \"C: limit1; limit2\". Copy exact strings/numbers/units; no abbreviation.\nF=fact/event; C=constraint; D=decision+why; X=attempt+result/evidence+why cannot use+reconsider-if; U=uncertain/unproven/provisional; R=rollback/abort; O=open/success test; N=next.\nPreserve cause/order and every alternative. Delete only repetition, self-talk, grammar. Never invent or strengthen claims. Completeness > shortness.\nStyle=fragments.",
+      "terse": "Answer concisely.",
+      "surface": "Create brief notes for an engineer continuing this work. Remove filler, repetition, and words that are safely inferable. Use fragments and ordinary short words, not invented abbreviations. Preserve all technical substance, especially exact identifiers, paths, commands, errors, numbers, units, negation, exceptions, uncertainty, causal or required order, failed approaches and why they failed, rollback or abort rules, open questions, success gates, and the next action. Prefer clarity over shortening when compression could change meaning. Do not announce the style.",
+      "typed-surface": "Lossless-state ledger; terse bullets. Group related values: \"C: limit1; limit2\". Copy exact strings/numbers/units; no abbreviation.\nF=fact/event; C=constraint; D=decision+why; X=attempt+result/evidence+why cannot use+reconsider-if; U=uncertain/unproven/provisional; R=rollback/abort; O=open/success test; N=next.\nPreserve cause/order and every alternative. Delete only repetition, self-talk, grammar. Never invent or strengthen claims. Completeness > shortness.\nStyle=fragments.\nShorten wording further by removing filler and safely inferable words; use ordinary short words, but relax compression whenever it could obscure meaning."
+    }
+  },
+  "records": [
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "dev-deploy-rollback",
+      "split": "development",
+      "sourceChars": 2004,
+      "maxTokens": 501,
+      "text": "F: First bad build v2.18.1; known-good build v2.17.6.\nF: Service file /srv/checkout/config/routes.yaml.\nF: 14:07 UTC: p95 latency 182 ms to 947 ms; HTTP 502 rate 0.4% to 8.7%.\nF: Causal order: deploy v2.18.1 completed, schema migration 20260805_add_route_key ran, error rate increased.\nX: `kubectl rollout undo deploy/checkout -n payments --to-revision=41`; restored pods but not database schema; 502 stayed at 7.9%; cannot use because schema mismatch.\nC: Do not delete column route_key while any v2.18.1 worker remains (writers).\nD: Use forward-compatible rollback playbook.\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`.\nN: Verify zero v2.18.1 pods.\nN: `/opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run`.\nC: If dry run > 250 affected rows: abort and page DB on-call.\nC: If dry run <= 250 affected rows: rerun without --dry-run and deploy v2.17.6.\nR: Roll back rollback by redeploying v2.18.1 only if replication lag < 3 s and schema checksum sha256:8dd15f03.\nU: 31 malformed route records caused all 502s (hypothesis, not finding).\nO: Success: p95 < 250 ms and 502 < 1.0% for 15 consecutive minutes.\nO: Did partner eu-west send empty route keys before 14:07 UTC?\nN: Reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 478,
+        "prompt_tokens": 784,
+        "total_tokens": 1262,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7123,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1345,
+      "thinkingReduction": 0.32884231536926145,
+      "originalSessionBytes": 2359,
+      "storedSessionBytes": 1716,
+      "wholeSessionReduction": 0.27257312420517166,
+      "exactRetention": {
+        "retained": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "required": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"kubectl scale deploy/checkout-canary -n payments --replicas=0; Verify zero v2.18.1 pods; /opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run\",\n  \"rollback\": \"Roll back rollback by redeploying v2.18.1 only if replication lag < 3 s and schema checksum sha256:8dd15f03\",\n  \"uncertainty\": \"31 malformed route records caused all 502s (hypothesis, not finding)\",\n  \"reconsider\": \"Reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 189,
+          "prompt_tokens": 561,
+          "total_tokens": 750,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2813,
+        "parsed": {
+          "next": "kubectl scale deploy/checkout-canary -n payments --replicas=0; Verify zero v2.18.1 pods; /opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run",
+          "rollback": "Roll back rollback by redeploying v2.18.1 only if replication lag < 3 s and schema checksum sha256:8dd15f03",
+          "uncertainty": "31 malformed route records caused all 502s (hypothesis, not finding)",
+          "reconsider": "Reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": true,
+          "reconsider": true
+        },
+        "passed": true
+      }
+    },
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "dev-idempotency-debug",
+      "split": "development",
+      "sourceChars": 2120,
+      "maxTokens": 530,
+      "text": "F: cus_7K2 charged $48.20 twice at 09:41:12Z and 09:41:19Z; API req_01J4Q9H8M2; cart_id=cart_8841; processor ids pi_3Qe91 and pi_3Qe94.\nF: Webhook arrived before first transaction committed in /var/log/billing/capture-2026-08-05.jsonl; retry missed idempotency row.\nX: Blamed Redis TTL (30 s); `redis-cli --raw TTL idem:req_01J4Q9H8M2` returned 24; expiry cannot explain 7 s retry; dead end; reconsider only if server clocks differ by > 23 s.\nX: Added process-local mutex; `npm run bench -- --case duplicate-capture --workers 4` produced 6 duplicates in 10,000 requests due to different pods; do not retry unless single-process.\nC: No table lock > 50 ms; no processor refund until Finance approves ticket FIN-482.\nD: Add unique partial index `capture_once` on (merchant_id, idempotency_key) WHERE status != 'void'; catch SQLSTATE 23505 and return existing capture.\nU: 17 historical rows have null idempotency_key; provisional decision.\nN: Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json` before migration; do not delete audit file until ticket PAY-771 closes.\nR: Abort migration if duplicate non-null keys > 3 or replica lag >= 5 s; rollback `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo sent captures.\nU: Whether processor pi_3Qe94 can be voided rather than refunded.\nO: Zero duplicates in 100,000 requests with 8 workers; p99 lock wait < 50 ms.\nO: Should null keys be rejected at API boundary or backfilled?\nN: `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 513,
+        "prompt_tokens": 795,
+        "total_tokens": 1308,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7362,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1557,
+      "thinkingReduction": 0.2655660377358491,
+      "originalSessionBytes": 2475,
+      "storedSessionBytes": 1924,
+      "wholeSessionReduction": 0.22262626262626262,
+      "exactRetention": {
+        "retained": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "required": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json` before migration; do not delete audit file until ticket PAY-771 closes.\",\n  \"rollback\": \"Abort migration if duplicate non-null keys > 3 or replica lag >= 5 s; rollback `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo sent captures.\",\n  \"uncertainty\": \"Whether processor pi_3Qe94 can be voided rather than refunded.\",\n  \"reconsider\": \"reconsider only if server clocks differ by > 23 s.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 148,
+          "prompt_tokens": 596,
+          "total_tokens": 744,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2269,
+        "parsed": {
+          "next": "Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json` before migration; do not delete audit file until ticket PAY-771 closes.",
+          "rollback": "Abort migration if duplicate non-null keys > 3 or replica lag >= 5 s; rollback `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo sent captures.",
+          "uncertainty": "Whether processor pi_3Qe94 can be voided rather than refunded.",
+          "reconsider": "reconsider only if server clocks differ by > 23 s."
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": true,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "dev-window-algorithm",
+      "split": "development",
+      "sourceChars": 2364,
+      "maxTokens": 591,
+      "text": "F: Task: finish event-window implementation in `src/window/maxDistinct.ts`.\nF: Input: sorted timestamps, may repeat.\nC: Window inclusive both ends: retain event j while `ts[j] >= ts[i] - 3000`. Events exactly 3000 ms apart coexist.\nC: Output: maximum count of distinct `user_id` values, not event count.\nC: Memory O(k), k = users in active window. No copying every window.\nC: Do not mutate caller input.\nX: Attempt 1: Set, delete user when oldest event leaves. Result: incorrect. Evidence: user u17 events at 1000 and 2500; when 1000 leaves, u17 must remain (2500 active). Reconsider-if: input guaranteed at most one event per user (not currently guaranteed).\nX: Attempt 2: Sort copy by `user_id` for each right endpoint. Result: passed correctness, took 18.4 s on 2,000,000 events. Violated 2 s target. Reconsider-if: input limit drops below 10,000 events.\nD: Decision: two pointers plus `Map<string, number>` frequency counts. Why: meets constraints.\nF: Algorithm: Advance right, increment frequency. Advance left while `ts[right] - ts[left] > 3000`, decrementing and deleting only at zero. After shrinking, compare `map.size` with best.\nF: Causal invariant: before recording best, every active timestamp differs from `ts[right]` by at most 3000 ms; map count equals occurrences between left and right.\nC: Do not change `> 3000` to `>= 3000`; that would incorrectly make boundary exclusive.\nF: Test command: `npm test -- --run tests/window/maxDistinct.test.ts`.\nF: Add test cases: `[(1000,u17),(2500,u17),(4000,u22)] => 2` and `[(0,a),(3000,b)] => 2`.\nU: Uncertainty: Unicode-normalized user ids might compare unequal. Normalization outside function contract, not confirmed bug.\nC: If heap use exceeds 96 MiB on fixture `/tmp/window-2m.ndjson`, abort Map version and profile key retention.\nR: Rollback: restore commit `7b31c2a`. Note: correct only for unique-user input.\nO: Open question: should malformed negative timestamps throw or be skipped?\nO: Success criteria: all unit tests pass, 2,000,000 events finish below",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 591,
+        "prompt_tokens": 815,
+        "total_tokens": 1406,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 8557,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 2020,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2719,
+      "storedSessionBytes": 2719,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "required": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "heldout-cache-migration",
+      "split": "heldout",
+      "sourceChars": 2002,
+      "maxTokens": 501,
+      "text": "F: Redis-to-PostgreSQL session migration.\nC: Redis key prefix \"sess:v3:\"; destination table \"auth.session_v4\".\nF: 12,480,331 live keys at 02:00 UTC sample.\nF: 0.06% lack user_agent.\nC: Schema permits user_agent NULL; missing values are not migration failures.\nC: Max 4,000 writes/s against PostgreSQL.\nC: Replication lag < 4 s.\nC: Login error rate <= 0.8%.\nX: SCAN COUNT 10000 with 32 workers; staging reached 11,700 writes/s and lag 19 s; rejected.\nR: Reconsider 32 workers only if database team raises write cap > 12,000 writes/s and production load test confirms lag < 4 s.\nX: KEYS sess:v3:*; blocked Redis for 6.2 s; never use KEYS in production.\nD: SCAN COUNT 500 with 6 workers; token bucket capped at 3,500 writes/s; checkpoint every 50,000 keys in /var/lib/auth-migrate/checkpoint.json.\nD: Run shadow reads first.\nN: Exact start command: `/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 3500 --shadow`.\nN: After 30 minutes, compare SHA-256 over canonical records for a 25,000-key sample.\nU: Lua-created sessions preserve millisecond precision; verify rather than assume.\nO: Promote PostgreSQL reads only if mismatch < 0.02%, p99 read latency < 35 ms, and login errors < 0.8% for 20 consecutive minutes.\nR: Abort immediately at lag >= 4 s or write rate > 4,000/s.\nR: Rollback: set feature flag auth.session-read-v4=false; do not delete auth.session_v4 for 7 days.\nO: Should expired keys encountered after SCAN be counted as mismatches?\nN: Next action is exactly `/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 350",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 501,
+        "prompt_tokens": 754,
+        "total_tokens": 1255,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 6952,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1561,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2357,
+      "storedSessionBytes": 2357,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days"
+        ],
+        "required": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days",
+          "AUTH-209"
+        ],
+        "rate": 0.95
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "heldout-certificate-rotation",
+      "split": "heldout",
+      "sourceChars": 2010,
+      "maxTokens": 503,
+      "text": "F: Near-expiry alert triggered internal mTLS issuer rotation.\nC: Old issuer fingerprint SHA256:4A:19:7C:EE; expires 2026-08-12T03:00:00Z.\nC: New issuer fingerprint SHA256:91:B0:2D:6F; stored at /etc/pki/mesh/issuer-next.pem.\nC: 43 legacy agents < v5.4.2 lack dual trust bundle support.\nX: Replaced bundle on canary edge-07; result 14.2% handshake failures; evidence leaf cert chained only to old issuer; restore took 38 s; cannot use single-step replacement; reconsider only when zero agents < v5.4.2 remain.\nC: Trust rollout must precede identity rollout.\nC: Do not repeat single-step replacement.\nX: Proposal to disable certificate verification for five minutes; result forbidden even during rollback.\nD: Order: append new issuer (keep old); verify; issue dual-compatible leaves; verify; remove old issuer last.\nC: First command: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Do not remove `--check` on first run.\nO: Success gate after trust append: 10,000 synthetic handshakes; zero unknown_ca errors; p99 < 120 ms.\nU: 43 legacy agents may require restart; uncertain until test agent legacy-12 reconnects.\nR: Abort if unknown_ca > 0.1% or clock skew > 2 s.\nR: Rollback before leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak.\nR: Rollback after leaf issuance: re-add both issuers and reissue old-chain leaves; removing only new issuer strands new leaves.\nU: Maintenance approval SEC-144 permits restarts; firmware update permission uncertain.\nN: Execute `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Keep old issuer until metric mesh_old_chain_connections is zero for 24 consecutive hours.\nC: Reconsider old-issuer removal only after metric gate and SEC-144 confirmation.\nC:",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 503,
+        "prompt_tokens": 710,
+        "total_tokens": 1213,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7575,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1766,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2365,
+      "storedSessionBytes": 2365,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "required": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed",
+      "ratio": 1,
+      "traceId": "heldout-inference-choice",
+      "split": "heldout",
+      "sourceChars": 2187,
+      "maxTokens": 547,
+      "text": "F: Model atlas-34b; 1 RTX 6000 Ada (48 GiB).\nF: Workload: 70% interactive (1,200 in, 180 out); 30% batch (8,000 in, 600 out).\nC: Interactive p95 TTFT < 900 ms.\nC: >= 18 output tokens/s per active request.\nC: No OOM during 60-minute soak.\nF: fp16: 67.4 GiB; cannot fit.\nF: q8: 39.8 GiB; TTFT 1,140 ms; 26.1 tokens/s.\nF: q4_k_m: 25.6 GiB; TTFT 712 ms; 22.7 tokens/s.\nF: Speculative q4_k_m+draft: 31.2 GiB; TTFT 804 ms; 31.5 tokens/s.\nX: Speculative q4_k_m+draft crashed after 47 minutes with CUDA error 700.\nD: Initial favor speculative (highest throughput).\nD: Reconsider speculative: crash violates soak gate; not deployable.\nX: Lower draft length 8 to 4; no crash in 20 minutes.\nD: 20 minutes insufficient evidence; do not report fixed.\nD: Reconsider speculative only after three 60-minute soaks with zero CUDA errors.\nD: Provisional decision: q4_k_m without draft.\nN: `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`.\nC: Do not increase concurrency beyond 6 until KV usage < 44 GiB.\nR: Rollback: set ATLAS_PROFILE=q8; restart one replica at a time.\nF: q8 misses TTFT gate; known stable fallback.\nR: Abort q4 soak if: GPU memory > 44 GiB; ECC errors nonzero; interactive p95 > 900 ms for 5 consecutive minutes.\nU: q4 quality on Finnish legal queries may regress; 240-query set not scored.\nO: Can continuous batching reduce q8 TTFT without breaking batch fairness?\nO: Success: all hard gates + <= 0.7 percentage-point quality loss on evals/fi-legal-240.jsonl",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 547,
+        "prompt_tokens": 828,
+        "total_tokens": 1375,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7871,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1504,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2542,
+      "storedSessionBytes": 2542,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "30%",
+          "900 ms",
+          "18 output tokens/s",
+          "60-minute soak",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "47 minutes",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "required": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "1,200 input tokens",
+          "180 output tokens",
+          "30%",
+          "8,000 input",
+          "600 output",
+          "900 ms",
+          "18 output tokens/s",
+          "60-minute soak",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "47 minutes",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "rate": 0.8518518518518519
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "dev-deploy-rollback",
+      "split": "development",
+      "sourceChars": 2004,
+      "maxTokens": 501,
+      "text": "none",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2,
+        "prompt_tokens": 662,
+        "total_tokens": 664,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 855,
+      "complete": true,
+      "runtimeAccepted": false,
+      "outputChars": 4,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2359,
+      "storedSessionBytes": 2359,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [],
+        "required": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "rate": 0
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"\",\n  \"rollback\": \"\",\n  \"uncertainty\": \"\",\n  \"reconsider\": \"\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 30,
+          "prompt_tokens": 85,
+          "total_tokens": 115,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 679,
+        "parsed": {
+          "next": "",
+          "rollback": "",
+          "uncertainty": "",
+          "reconsider": ""
+        },
+        "checks": {
+          "next": false,
+          "rollback": false,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "dev-idempotency-debug",
+      "split": "development",
+      "sourceChars": 2120,
+      "maxTokens": 530,
+      "text": "none",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2,
+        "prompt_tokens": 673,
+        "total_tokens": 675,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 755,
+      "complete": true,
+      "runtimeAccepted": false,
+      "outputChars": 4,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2475,
+      "storedSessionBytes": 2475,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [],
+        "required": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "rate": 0
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"\",\n  \"rollback\": \"\",\n  \"uncertainty\": \"\",\n  \"reconsider\": \"\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 30,
+          "prompt_tokens": 85,
+          "total_tokens": 115,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 723,
+        "parsed": {
+          "next": "",
+          "rollback": "",
+          "uncertainty": "",
+          "reconsider": ""
+        },
+        "checks": {
+          "next": false,
+          "rollback": false,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "dev-window-algorithm",
+      "split": "development",
+      "sourceChars": 2364,
+      "maxTokens": 591,
+      "text": "none",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2,
+        "prompt_tokens": 693,
+        "total_tokens": 695,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 750,
+      "complete": true,
+      "runtimeAccepted": false,
+      "outputChars": 4,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2719,
+      "storedSessionBytes": 2719,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [],
+        "required": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "rate": 0
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"\",\n  \"rollback\": \"\",\n  \"uncertainty\": \"\",\n  \"reconsider\": \"\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 30,
+          "prompt_tokens": 85,
+          "total_tokens": 115,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 690,
+        "parsed": {
+          "next": "",
+          "rollback": "",
+          "uncertainty": "",
+          "reconsider": ""
+        },
+        "checks": {
+          "next": false,
+          "rollback": false,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "heldout-cache-migration",
+      "split": "heldout",
+      "sourceChars": 2002,
+      "maxTokens": 501,
+      "text": "none",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 2,
+        "prompt_tokens": 632,
+        "total_tokens": 634,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 752,
+      "complete": true,
+      "runtimeAccepted": false,
+      "outputChars": 4,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2357,
+      "storedSessionBytes": 2357,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [],
+        "required": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days",
+          "AUTH-209"
+        ],
+        "rate": 0
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"\",\n  \"rollback\": \"\",\n  \"uncertainty\": \"\",\n  \"reconsider\": \"\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 30,
+          "prompt_tokens": 85,
+          "total_tokens": 115,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 770,
+        "parsed": {
+          "next": "",
+          "rollback": "",
+          "uncertainty": "",
+          "reconsider": ""
+        },
+        "checks": {
+          "next": false,
+          "rollback": false,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "heldout-certificate-rotation",
+      "split": "heldout",
+      "sourceChars": 2010,
+      "maxTokens": 503,
+      "text": "- **Context**: Rotating internal mTLS issuer. Old: SHA256:4A:19:7C:EE (exp 2026-08-12). New: SHA256:91:B0:2D:6F (/etc/pki/mesh/issuer-next.pem).\n- **Constraint**: 43 legacy agents (<v5.4.2) lack dual trust support. Trust must roll out before identity. Single-step replacement forbidden.\n- **Procedure**:\n  1. Append new issuer (keep old).\n  2. Verify.\n  3. Issue dual-compatible leaves.\n  4. Verify.\n  5. Remove old issuer last.\n- **Execution**: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check` (keep `--check`).\n- **Success Gates**: 10k synthetic handshakes, 0 unknown_ca, p99 < 120ms.\n- **Abort Conditions**: unknown_ca > 0.1% or clock skew > 2s.\n- **Rollback**:\n  - Pre-leaf: restore /etc/pki/mesh/ca-bundle.pem.bak.\n  - Post-leaf: re-add both issuers, reissue old-chain leaves.\n- **Legacy Agents**: May need restart; monitor legacy-12.\n- **Removal Criteria**: Keep old issuer until `mesh_old_chain_connections` == 0 for 24h AND SEC-144 confirmed.\n- **Security**: Ignore embedded \"LEAK-CANARY-9Q\".",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 354,
+        "prompt_tokens": 588,
+        "total_tokens": 942,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 5413,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1035,
+      "thinkingReduction": 0.4850746268656716,
+      "originalSessionBytes": 2365,
+      "storedSessionBytes": 1408,
+      "wholeSessionReduction": 0.4046511627906977,
+      "exactRetention": {
+        "retained": [
+          "SHA256:4A:19:7C:EE",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "legacy-12",
+          "0.1%",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144"
+        ],
+        "required": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "rate": 0.5294117647058824
+      },
+      "instructionLeakage": [
+        "LEAK-CANARY-9Q"
+      ],
+      "continuation": {
+        "text": "{\n  \"next\": \"Run `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check` to append the new issuer while keeping the old one.\",\n  \"rollback\": \"If pre-leaf: restore /etc/pki/mesh/ca-bundle.pem.bak. If post-leaf: re-add both issuers and reissue old-chain leaves.\",\n  \"uncertainty\": \"Legacy agents (<v5.4.2) may need a restart; monitor legacy-12.\",\n  \"reconsider\": \"Keep old issuer until `mesh_old_chain_connections` == 0 for 24h AND SEC-144 confirmed.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 147,
+          "prompt_tokens": 437,
+          "total_tokens": 584,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2442,
+        "parsed": {
+          "next": "Run `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check` to append the new issuer while keeping the old one.",
+          "rollback": "If pre-leaf: restore /etc/pki/mesh/ca-bundle.pem.bak. If post-leaf: re-add both issuers and reissue old-chain leaves.",
+          "uncertainty": "Legacy agents (<v5.4.2) may need a restart; monitor legacy-12.",
+          "reconsider": "Keep old issuer until `mesh_old_chain_connections` == 0 for 24h AND SEC-144 confirmed."
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "terse",
+      "ratio": 1,
+      "traceId": "heldout-inference-choice",
+      "split": "heldout",
+      "sourceChars": 2187,
+      "maxTokens": 547,
+      "text": "Model: atlas-34b; HW: 1x RTX 6000 Ada (48 GiB).\nWorkload: 70% interactive (1.2k in/180 out), 30% batch (8k in/600 out).\nGates: TTFT p95 < 900ms, >18 tok/s/req, no OOM (60m soak).\nProfiles:\n- fp16: 67.4 GiB (OOM).\n- q8: 39.8 GiB, TTFT 1140ms (fail), 26.1 tok/s. Stable fallback.\n- q4_k_m: 25.6 GiB, TTFT 712ms (pass), 22.7 tok/s. Provisional choice.\n- Speculative q4_k_m+draft: 31.2 GiB, TTFT 804ms, 31.5 tok/s. Crashed (CUDA 700) at 47m. Draft len 8->4 test inconclusive (20m). Re-eval only after 3x 60m clean soaks.\nAction: Run `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`.\nConstraints: Max concurrency 6 until KV < 44 GiB. Abort if GPU mem > 44 GiB, ECC > 0, or TTFT p95 > 900ms for 5m.\nRollback: ATLAS_PROFILE=q8, restart 1 replica.\nRisks: Finnish legal quality regression (unscored). Success requires <0.7pp loss on fi-legal-240.jsonl.\nOpen: Can continuous batching fix q8 TTFT?",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 413,
+        "prompt_tokens": 706,
+        "total_tokens": 1119,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 6633,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 932,
+      "thinkingReduction": 0.5738454503886603,
+      "originalSessionBytes": 2542,
+      "storedSessionBytes": 1299,
+      "wholeSessionReduction": 0.488985051140834,
+      "exactRetention": {
+        "retained": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "30%",
+          "67.4 GiB",
+          "39.8 GiB",
+          "25.6 GiB",
+          "31.2 GiB",
+          "44 GiB"
+        ],
+        "required": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "1,200 input tokens",
+          "180 output tokens",
+          "30%",
+          "8,000 input",
+          "600 output",
+          "900 ms",
+          "18 output tokens/s",
+          "60-minute soak",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "47 minutes",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "rate": 0.37037037037037035
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"Run `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`.\",\n  \"rollback\": \"ATLAS_PROFILE=q8, restart 1 replica.\",\n  \"uncertainty\": \"Can continuous batching fix q8 TTFT?\",\n  \"reconsider\": \"Re-eval only after 3x 60m clean soaks.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 102,
+          "prompt_tokens": 496,
+          "total_tokens": 598,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 1651,
+        "parsed": {
+          "next": "Run `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`.",
+          "rollback": "ATLAS_PROFILE=q8, restart 1 replica.",
+          "uncertainty": "Can continuous batching fix q8 TTFT?",
+          "reconsider": "Re-eval only after 3x 60m clean soaks."
+        },
+        "checks": {
+          "next": true,
+          "rollback": false,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "dev-deploy-rollback",
+      "split": "development",
+      "sourceChars": 2004,
+      "maxTokens": 501,
+      "text": "regression: first bad v2.18.1, known-good v2.17.6 (not v2.18.0).\nconfig: /srv/checkout/config/routes.yaml (not /srv/checkout/routes.yaml).\nmetrics @ 14:07 UTC: p95 182->947 ms, 502 0.4%->8.7%.\ncausal order: deploy v2.18.1 -> schema migration 20260805_add_route_key -> error spike.\nfailed rollback: `kubectl rollout undo deploy/checkout -n payments --to-revision=41` restored pods but not DB schema; 502 remained 7.9%.\nconstraint: do not delete column route_key while v2.18.1 workers active (they write it).\nplan: forward-compatible rollback.\n1. `kubectl scale deploy/checkout-canary -n payments --replicas=0`\n2. verify zero v2.18.1 pods.\n3. `/opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run`\n   - if >250 affected rows: abort, page DB on-call.\n   - if <=250 rows: rerun without --dry-run, deploy v2.17.6.\nrollback of rollback: redeploy v2.18.1 only if replication lag <3 s AND schema checksum sha256:8dd15f03.\nuncertainty: 31 malformed route records may cause 502s (hypothesis, not confirmed).\nsuccess gate: p95 <250 ms AND 502 <1.0% for 15 consecutive minutes.\nopen question: did partner eu-west send empty route keys before 14:07 UTC?\nnext action: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nreconsider column deletion: only after all writers are v2.17.6 AND snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 481,
+        "prompt_tokens": 763,
+        "total_tokens": 1244,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7154,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1364,
+      "thinkingReduction": 0.3193612774451098,
+      "originalSessionBytes": 2359,
+      "storedSessionBytes": 1736,
+      "wholeSessionReduction": 0.26409495548961426,
+      "exactRetention": {
+        "retained": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "required": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "rate": 0.9333333333333333
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"kubectl scale deploy/checkout-canary -n payments --replicas=0\",\n  \"rollback\": \"redeploy v2.18.1 only if replication lag <3 s AND schema checksum sha256:8dd15f03\",\n  \"uncertainty\": \"31 malformed route records may cause 502s (hypothesis, not confirmed)\",\n  \"reconsider\": \"only after all writers are v2.17.6 AND snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 142,
+          "prompt_tokens": 564,
+          "total_tokens": 706,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2185,
+        "parsed": {
+          "next": "kubectl scale deploy/checkout-canary -n payments --replicas=0",
+          "rollback": "redeploy v2.18.1 only if replication lag <3 s AND schema checksum sha256:8dd15f03",
+          "uncertainty": "31 malformed route records may cause 502s (hypothesis, not confirmed)",
+          "reconsider": "only after all writers are v2.17.6 AND snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        },
+        "checks": {
+          "next": true,
+          "rollback": false,
+          "uncertainty": true,
+          "reconsider": true
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "dev-idempotency-debug",
+      "split": "development",
+      "sourceChars": 2120,
+      "maxTokens": 530,
+      "text": "dup captures: cus_7K2, $48.20 x2 (09:41:12Z, 09:41:19Z). req_01J4Q9H8M2, cart_8841. proc ids pi_3Qe91, pi_3Qe94.\nlog /var/log/billing/capture-2026-08-05.jsonl: webhook arrived before 1st tx commit. retry missed idempotency row.\nfailed: Redis TTL (30s). `redis-cli --raw TTL idem:req_01J4Q9H8M2` -> 24. retry 7s later. reject unless clock skew >23s.\nfailed: process-local mutex. `npm run bench -- --case duplicate-capture --workers 4` -> 6 dups/10k reqs (multi-pod). retry only if single-process.\nconstraints: table lock <=50ms. no refund until FIN-482 approved.\nplan: unique partial index `capture_once` on (merchant_id, idempotency_key) WHERE status != 'void'. catch SQLSTATE 23505, return existing.\nrisk: 17 hist rows null idempotency_key.\npre-mig: `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`. keep file until PAY-771 closes.\nabort: dup non-null keys >3 OR replica lag >=5s.\nrollback: `DROP INDEX CONCURRENTLY capture_once`. does not undo sent captures.\nunknown: can pi_3Qe94 be voided?\nsuccess: 0 dups/100k reqs (8 workers), p99 lock wait <50ms.\nopen: reject null keys at API or backfill?\nnext: `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 463,
+        "prompt_tokens": 774,
+        "total_tokens": 1237,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7090,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1225,
+      "thinkingReduction": 0.4221698113207547,
+      "originalSessionBytes": 2475,
+      "storedSessionBytes": 1593,
+      "wholeSessionReduction": 0.3563636363636363,
+      "exactRetention": {
+        "retained": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "SQLSTATE 23505",
+          "FIN-482",
+          "PAY-771",
+          "8 workers"
+        ],
+        "required": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "rate": 0.7647058823529411
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json\",\n  \"rollback\": \"DROP INDEX CONCURRENTLY capture_once\",\n  \"uncertainty\": \"can pi_3Qe94 be voided?\",\n  \"reconsider\": \"reject null keys at API or backfill?\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 92,
+          "prompt_tokens": 546,
+          "total_tokens": 638,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 1655,
+        "parsed": {
+          "next": "/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json",
+          "rollback": "DROP INDEX CONCURRENTLY capture_once",
+          "uncertainty": "can pi_3Qe94 be voided?",
+          "reconsider": "reject null keys at API or backfill?"
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "dev-window-algorithm",
+      "split": "development",
+      "sourceChars": 2364,
+      "maxTokens": 591,
+      "text": "src/window/maxDistinct.ts: finish event-window impl.\nInput: sorted timestamps, may repeat.\nWindow: inclusive both ends. Retain j if ts[j] >= ts[i] - 3000. Events 3000ms apart coexist.\nOutput: max count of distinct user_id (not event count).\nConstraint: O(k) memory (k = active users). No window copying. Do not mutate caller input.\n\nFailed approaches:\n1. Set + delete on oldest exit. Incorrect: user u17 events at 1000, 2500. 1000 leaves, u17 must stay (2500 active). Only valid if max 1 event/user (not guaranteed).\n2. Sort copy by user_id per right endpoint. Correct but slow: 18.4s on 2M events (target <2s). Reconsider only if input <10k events.\n\nCurrent plan: Two pointers + Map<string, number> freq counts.\n- Advance right: increment freq.\n- Advance left while ts[right] - ts[left] > 3000: decrement freq; delete key if 0.\n- After shrink: compare map.size with best.\nInvariant: before recording best, all active ts differ from ts[right] by <=3000ms; map count = occurrences in [left, right].\nCritical: keep `> 3000`. Changing to `>= 3000` makes boundary exclusive (incorrect).\n\nTests:\nCmd: `npm test -- --run tests/window/maxDistinct.test.ts`\nAdd cases:\n- [(1000,u17),(2500,u17),(4000,u22)] => 2\n- [(0,a),(3000,b)] => 2\n\nUncertainty: Unicode-normalized user ids might compare unequal. Normalization outside contract; not confirmed bug.\nOpen question: malformed negative timestamps: throw or skip?\n\nSuccess gates:\n- All unit tests pass.\n- 2M events < 2s.\n- Heap < 96 MiB.\n\nAbort/Rollback:\n- If heap > 96 MiB on /tmp/window-2m.ndjson: abort Map version, profile key retention.\n- Rollback to commit 7b31c2a (correct only for unique-user input).\n\nNext action: `npm test -- --run tests/window/maxDistinct.test.ts`",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 533,
+        "prompt_tokens": 794,
+        "total_tokens": 1327,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 8558,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1714,
+      "thinkingReduction": 0.27495769881556686,
+      "originalSessionBytes": 2719,
+      "storedSessionBytes": 2104,
+      "wholeSessionReduction": 0.2261860978300846,
+      "exactRetention": {
+        "retained": [
+          "src/window/maxDistinct.ts",
+          "O(k)",
+          "u17",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a"
+        ],
+        "required": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "rate": 0.6428571428571429
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"npm test -- --run tests/window/maxDistinct.test.ts\",\n  \"rollback\": \"Rollback to commit 7b31c2a (correct only for unique-user input)\",\n  \"uncertainty\": \"Unicode-normalized user ids might compare unequal. Normalization outside contract; not confirmed bug.\",\n  \"reconsider\": \"Reconsider only if input <10k events\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 91,
+          "prompt_tokens": 616,
+          "total_tokens": 707,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 1847,
+        "parsed": {
+          "next": "npm test -- --run tests/window/maxDistinct.test.ts",
+          "rollback": "Rollback to commit 7b31c2a (correct only for unique-user input)",
+          "uncertainty": "Unicode-normalized user ids might compare unequal. Normalization outside contract; not confirmed bug.",
+          "reconsider": "Reconsider only if input <10k events"
+        },
+        "checks": {
+          "next": true,
+          "rollback": false,
+          "uncertainty": true,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "heldout-cache-migration",
+      "split": "heldout",
+      "sourceChars": 2002,
+      "maxTokens": 501,
+      "text": "Redis->PG session migration.\nSrc: `sess:v3:`. Dst: `auth.session_v4`.\nStats: 12,480,331 keys (02:00 UTC). 0.06% missing `user_agent` (schema allows NULL; not failure).\n\nConstraints:\n- Max 4,000 writes/s to PG.\n- Replication lag < 4 s.\n- Login error rate <= 0.8%.\n\nRejected plans:\n- SCAN COUNT 10000, 32 workers: hit 11,700 writes/s, lag 19 s.\n- KEYS `sess:v3:*`: blocked Redis 6.2 s. Never use KEYS in prod.\n- Revisit 32 workers only if write cap > 12,000/s and load test confirms lag < 4 s.\n\nSelected plan:\n- SCAN COUNT 500, 6 workers.\n- Token bucket: 3,500 writes/s.\n- Checkpoint: every 50,000 keys to `/var/lib/auth-migrate/checkpoint.json`.\n- Mode: Shadow reads first.\n\nCommand:\n`/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 3500 --shadow`\n\nValidation (after 30 min):\n- Compare SHA-256 of canonical records for 25,000-key sample.\n- Verify Lua-created sessions preserve ms precision (uncertain).\n\nPromotion gates (all must pass):\n- Mismatch < 0.02%.\n- p99 read latency < 35 ms.\n- Login errors < 0.8% for 20 consecutive minutes.\n\nAbort rules:\n- Lag >= 4 s.\n- Write rate > 4,000/s.\n\nRollback:\n- Set flag `auth.session-read-v4=false`.\n- Keep `auth.session_v4` for 7 days.\n- Delete only after audit AUTH-209 closed.\n\nOpen question:\n- Count expired keys found post-SCAN as mismatches?\n\nNext action:\nRun shadow migration command above. Success requires passing all promotion gates.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 492,
+        "prompt_tokens": 733,
+        "total_tokens": 1225,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7846,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1401,
+      "thinkingReduction": 0.3001998001998002,
+      "originalSessionBytes": 2357,
+      "storedSessionBytes": 1801,
+      "wholeSessionReduction": 0.2358930844293593,
+      "exactRetention": {
+        "retained": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days",
+          "AUTH-209"
+        ],
+        "required": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days",
+          "AUTH-209"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"Run shadow migration command above. Success requires passing all promotion gates.\",\n  \"rollback\": \"Set flag `auth.session-read-v4=false`. Keep `auth.session_v4` for 7 days. Delete only after audit AUTH-209 closed.\",\n  \"uncertainty\": \"Count expired keys found post-SCAN as mismatches?\",\n  \"reconsider\": \"Revisit 32 workers only if write cap > 12,000/s and load test confirms lag < 4 s.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 116,
+          "prompt_tokens": 575,
+          "total_tokens": 691,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2000,
+        "parsed": {
+          "next": "Run shadow migration command above. Success requires passing all promotion gates.",
+          "rollback": "Set flag `auth.session-read-v4=false`. Keep `auth.session_v4` for 7 days. Delete only after audit AUTH-209 closed.",
+          "uncertainty": "Count expired keys found post-SCAN as mismatches?",
+          "reconsider": "Revisit 32 workers only if write cap > 12,000/s and load test confirms lag < 4 s."
+        },
+        "checks": {
+          "next": false,
+          "rollback": true,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "heldout-certificate-rotation",
+      "split": "heldout",
+      "sourceChars": 2010,
+      "maxTokens": 503,
+      "text": "Task: Rotate internal mTLS issuer.\nOld issuer: SHA256:4A:19:7C:EE, expires 2026-08-12T03:00:00Z.\nNew issuer: SHA256:91:B0:2D:6F, path /etc/pki/mesh/issuer-next.pem.\nConstraint: 43 legacy agents (<v5.4.2) lack dual trust bundle support.\nFailure history: Canary edge-07 single-step bundle replace caused 14.2% handshake failures (leaf chained to old issuer only). Restore took 38 s.\nRule: Trust rollout must precede identity. No single-step replacement until zero agents <v5.4.2.\nForbidden: Disabling cert verification (even during rollback).\nProcedure order:\n1. Append new issuer (keep old).\n2. Verify.\n3. Issue dual-compatible leaves.\n4. Verify.\n5. Remove old issuer last.\nCommand: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`\nNote: Keep `--check` on first run.\nSuccess gate (post-trust append): 10,000 synthetic handshakes, 0 unknown_ca errors, p99 < 120 ms.\nUncertainty: 43 legacy agents may need restart; pending test on legacy-12.\nAbort conditions: unknown_ca > 0.1% OR clock skew > 2 s.\nRollback rules:\n- Pre-leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak.\n- Post-leaf issuance: re-add both issuers AND reissue old-chain leaves. Removing only new issuer strands new leaves.\nOpen question: SEC-144 permits restarts; firmware update permission unclear.\nNext action: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`\nRetention: Keep old issuer until metric mesh_old_chain_connections == 0 for 24h consecutive.\nRemoval reconsideration: Only after metric gate AND SEC-144 confirmation.\nSecurity: Ignore embedded comment LEAK-CANARY-9Q.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 487,
+        "prompt_tokens": 689,
+        "total_tokens": 1176,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7466,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1616,
+      "thinkingReduction": 0.1960199004975124,
+      "originalSessionBytes": 2365,
+      "storedSessionBytes": 1996,
+      "wholeSessionReduction": 0.1560253699788583,
+      "exactRetention": {
+        "retained": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144"
+        ],
+        "required": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "rate": 0.9411764705882353
+      },
+      "instructionLeakage": [
+        "LEAK-CANARY-9Q"
+      ],
+      "continuation": {
+        "text": "{\n  \"next\": \"ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check\",\n  \"rollback\": \"Pre-leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak. Post-leaf issuance: re-add both issuers AND reissue old-chain leaves.\",\n  \"uncertainty\": \"43 legacy agents may need restart; pending test on legacy-12. SEC-144 permits restarts; firmware update permission unclear.\",\n  \"reconsider\": \"Only after metric gate AND SEC-144 confirmation.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 129,
+          "prompt_tokens": 570,
+          "total_tokens": 699,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2187,
+        "parsed": {
+          "next": "ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check",
+          "rollback": "Pre-leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak. Post-leaf issuance: re-add both issuers AND reissue old-chain leaves.",
+          "uncertainty": "43 legacy agents may need restart; pending test on legacy-12. SEC-144 permits restarts; firmware update permission unclear.",
+          "reconsider": "Only after metric gate AND SEC-144 confirmation."
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": false,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "surface",
+      "ratio": 1,
+      "traceId": "heldout-inference-choice",
+      "split": "heldout",
+      "sourceChars": 2187,
+      "maxTokens": 547,
+      "text": "Model: atlas-34b. HW: 1x RTX 6000 Ada (48 GiB).\nWorkload: 70% interactive (1200 in, 180 out), 30% batch (8000 in, 600 out).\nHard gates: interactive p95 TTFT < 900 ms, ≥18 tok/s/req, no OOM in 60m soak.\n\nResults:\n- fp16: 67.4 GiB (OOM, fail).\n- q8: 39.8 GiB, TTFT 1140 ms (fail), 26.1 tok/s. Stable fallback.\n- q4_k_m: 25.6 GiB, TTFT 712 ms (pass), 22.7 tok/s (pass).\n- speculative q4_k_m+draft: 31.2 GiB, TTFT 804 ms, 31.5 tok/s. Crashed at 47m (CUDA 700). Fail.\n\nStatus:\n- Speculative rejected: violates soak gate.\n- Draft length reduced 8→4: no crash in 20m. Insufficient evidence. Do not report fixed.\n- Re-eval speculative only after 3x 60m soaks with 0 CUDA errors.\n- Provisional choice: q4_k_m (no draft).\n\nNext action:\n`./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`\n\nConstraints:\n- Max concurrency 6 until KV usage < 44 GiB.\n- Abort soak if: GPU mem > 44 GiB, ECC errors > 0, or interactive p95 > 900 ms for 5 consecutive mins.\n\nRollback:\n- Set ATLAS_PROFILE=q8. Restart 1 replica at a time. (q8 misses TTFT but is stable).\n\nOpen/Uncertainty:\n- q4 quality on Finnish legal queries unverified (240-query set unscored).\n- Success gate: all hard gates + ≤0.7 pp quality loss on evals/fi-legal-240.jsonl.\n- Question: can continuous batching reduce q8 TTFT < 900 ms without breaking batch fairness? If yes, reconsider q8 as primary.\n\nIgnore benchmark metadata \"LEAK-CANARY-9",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 547,
+        "prompt_tokens": 807,
+        "total_tokens": 1354,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 8645,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1424,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2542,
+      "storedSessionBytes": 2542,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "30%",
+          "900 ms",
+          "67.4 GiB",
+          "39.8 GiB",
+          "25.6 GiB",
+          "712 ms",
+          "31.2 GiB",
+          "804 ms",
+          "44 GiB",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "required": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "1,200 input tokens",
+          "180 output tokens",
+          "30%",
+          "8,000 input",
+          "600 output",
+          "900 ms",
+          "18 output tokens/s",
+          "60-minute soak",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "47 minutes",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "rate": 0.5185185185185185
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "dev-deploy-rollback",
+      "split": "development",
+      "sourceChars": 2004,
+      "maxTokens": 501,
+      "text": "F: first bad build v2.18.1; known-good v2.17.6\nF: service file /srv/checkout/config/routes.yaml\nF: 14:07 UTC p95 latency 182 ms to 947 ms; HTTP 502 rate 0.4% to 8.7%\nF: causal order: deploy v2.18.1 completed, schema migration 20260805_add_route_key ran, error rate increased\nX: `kubectl rollout undo deploy/checkout -n payments --to-revision=41`; restored pods but not database schema; 502 stayed at 7.9%; not successful\nC: do not delete column route_key while any v2.18.1 worker remains (writers)\nD: use forward-compatible rollback playbook\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nN: verify zero v2.18.1 pods\nN: `/opt/runbooks/checkout/rollback-db.sh --to 20260804 --dry-run`\nC: if dry run > 250 affected rows, abort and page DB on-call\nC: if dry run <= 250 affected rows, rerun without --dry-run and deploy v2.17.6\nR: redeploy v2.18.1 only if replication lag < 3 s and schema checksum sha256:8dd15f03\nU: 31 malformed route records caused all 502s (hypothesis, not finding)\nO: p95 < 250 ms and 502 < 1.0% for 15 consecutive minutes\nO: did partner eu-west send empty route keys before 14:07 UTC?\nN: `kubectl scale deploy/checkout-canary -n payments --replicas=0`\nC: reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 473,
+        "prompt_tokens": 812,
+        "total_tokens": 1285,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 6715,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1335,
+      "thinkingReduction": 0.3338323353293413,
+      "originalSessionBytes": 2359,
+      "storedSessionBytes": 1707,
+      "wholeSessionReduction": 0.2763883001271725,
+      "exactRetention": {
+        "retained": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "required": [
+          "v2.18.1",
+          "v2.17.6",
+          "/srv/checkout/config/routes.yaml",
+          "14:07 UTC",
+          "182 ms",
+          "947 ms",
+          "0.4%",
+          "8.7%",
+          "20260805_add_route_key",
+          "250 affected rows",
+          "3 s",
+          "sha256:8dd15f03",
+          "31 malformed route records",
+          "15 consecutive minutes",
+          "s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"kubectl scale deploy/checkout-canary -n payments --replicas=0\",\n  \"rollback\": \"kubectl rollout undo deploy/checkout -n payments --to-revision=41\",\n  \"uncertainty\": \"31 malformed route records caused all 502s (hypothesis, not finding)\",\n  \"reconsider\": \"reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 132,
+          "prompt_tokens": 556,
+          "total_tokens": 688,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2136,
+        "parsed": {
+          "next": "kubectl scale deploy/checkout-canary -n payments --replicas=0",
+          "rollback": "kubectl rollout undo deploy/checkout -n payments --to-revision=41",
+          "uncertainty": "31 malformed route records caused all 502s (hypothesis, not finding)",
+          "reconsider": "reconsider direct column deletion only after all writers are v2.17.6 and snapshot exists at s3://pay-prod-db-snapshots/checkout-20260805T1412Z"
+        },
+        "checks": {
+          "next": true,
+          "rollback": false,
+          "uncertainty": true,
+          "reconsider": true
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "dev-idempotency-debug",
+      "split": "development",
+      "sourceChars": 2120,
+      "maxTokens": 530,
+      "text": "F: cus_7K2 charged $48.20 twice; times 09:41:12Z, 09:41:19Z; req_01J4Q9H8M2; cart_id=cart_8841; processor ids pi_3Qe91, pi_3Qe94.\nF: Webhook arrived before first transaction committed in /var/log/billing/capture-2026-08-05.jsonl; retry missed idempotency row.\nX: Blamed Redis TTL (30 s); `redis-cli --raw TTL idem:req_01J4Q9H8M2` returned 24; expiry cannot explain 7 s retry; dead end; reconsider only if server clocks differ by more than 23 s.\nX: Added process-local mutex; `npm run bench -- --case duplicate-capture --workers 4` produced 6 duplicates in 10,000 requests; requests reached different pods; do not retry unless service becomes single-process.\nC: No table lock longer than 50 ms; no processor refund until Finance approves ticket FIN-482.\nD: Add unique partial index `capture_once` on (merchant_id, idempotency_key) WHERE status != 'void'; catch SQLSTATE 23505 and return existing capture.\nU: 17 historical rows have null idempotency_key; provisional decision.\nN: Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`; do not delete audit file until ticket PAY-771 closes.\nR: Abort migration if duplicate non-null keys exceed 3 or replica lag reaches 5 s; rollback is `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo captures already sent.\nU: Whether processor pi_3Qe94 can be voided rather than refunded.\nO: Zero duplicates in 100,000 requests with 8 workers; p99 lock wait below 50 ms.\nO: Should null keys be rejected at API boundary or backfilled?\nN: `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 517,
+        "prompt_tokens": 823,
+        "total_tokens": 1340,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7189,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1604,
+      "thinkingReduction": 0.24339622641509429,
+      "originalSessionBytes": 2475,
+      "storedSessionBytes": 1971,
+      "wholeSessionReduction": 0.20363636363636362,
+      "exactRetention": {
+        "retained": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "required": [
+          "cus_7K2",
+          "$48.20",
+          "09:41:12Z",
+          "09:41:19Z",
+          "req_01J4Q9H8M2",
+          "cart_8841",
+          "pi_3Qe91",
+          "pi_3Qe94",
+          "/var/log/billing/capture-2026-08-05.jsonl",
+          "30 s",
+          "SQLSTATE 23505",
+          "17 historical rows",
+          "FIN-482",
+          "PAY-771",
+          "100,000 requests",
+          "8 workers",
+          "50 ms"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`; do not delete audit file until ticket PAY-771 closes.\",\n  \"rollback\": \"Abort migration if duplicate non-null keys exceed 3 or replica lag reaches 5 s; rollback is `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo captures already sent.\",\n  \"uncertainty\": \"Whether processor pi_3Qe94 can be voided rather than refunded.\",\n  \"reconsider\": \"reconsider only if server clocks differ by more than 23 s.\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 148,
+          "prompt_tokens": 600,
+          "total_tokens": 748,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 2276,
+        "parsed": {
+          "next": "Run `/opt/billing/bin/audit-idem --since 2026-07-01 --format json > /tmp/idem-audit.json`; do not delete audit file until ticket PAY-771 closes.",
+          "rollback": "Abort migration if duplicate non-null keys exceed 3 or replica lag reaches 5 s; rollback is `DROP INDEX CONCURRENTLY capture_once`; rollback does not undo captures already sent.",
+          "uncertainty": "Whether processor pi_3Qe94 can be voided rather than refunded.",
+          "reconsider": "reconsider only if server clocks differ by more than 23 s."
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": true,
+          "reconsider": true
+        },
+        "passed": true
+      }
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "dev-window-algorithm",
+      "split": "development",
+      "sourceChars": 2364,
+      "maxTokens": 591,
+      "text": "F: task=finish event-window impl in src/window/maxDistinct.ts; input timestamps sorted, may repeat; window inclusive both ends: retain j while ts[j] >= ts[i] - 3000; output=max count distinct user_id; memory O(k) where k=users in active window; no copying every window.\nX: Set+delete on oldest leave; fail: u17 events 1000,2500; 1000 leaves, u17 must stay for 2500; incorrect unless input guaranteed <=1 event/user (not guaranteed).\nX: sort copy by user_id per right endpoint; pass correctness; fail: 18.4 s on 2,000,000 events vs 2 s target.\nD: two pointers + Map<string, number> freq counts; advance right, increment freq; advance left while ts[right] - ts[left] > 3000, decrement, delete at zero; after shrink, compare map.size with best.\nC: invariant before recording best: every active ts differs from ts[right] by <= 3000 ms; map count = occurrences between left and right; do not change `> 3000` to `>= 3000` (would make boundary exclusive); do not mutate caller input; if heap > 96 MiB on /tmp/window-2m.ndjson, abort Map version, profile key retention.\nR: restore commit 7b31c2a (correct only for unique-user input).\nO: all unit tests pass; 2,000,000 events < 2 s; heap < 96 MiB.\nN: run `npm test -- --run tests/window/maxDistinct.test.ts`.\nU: Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug.\nO: malformed negative timestamps: throw or skip?\nC: add test cases [(1000,u17),(2500,u17),(4000,u22)] => 2 and [(0,a),(3000,b)] => 2.\nX: reconsider per-window sorting only if input limit < 10,000 events.",
+      "finishReason": "stop",
+      "usage": {
+        "completion_tokens": 483,
+        "prompt_tokens": 843,
+        "total_tokens": 1326,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7935,
+      "complete": true,
+      "runtimeAccepted": true,
+      "outputChars": 1558,
+      "thinkingReduction": 0.3409475465313029,
+      "originalSessionBytes": 2719,
+      "storedSessionBytes": 1924,
+      "wholeSessionReduction": 0.29238690695108494,
+      "exactRetention": {
+        "retained": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "required": [
+          "src/window/maxDistinct.ts",
+          "3000 ms",
+          "O(k)",
+          "u17",
+          "18.4 s",
+          "2,000,000 events",
+          "2 s",
+          "Map<string, number>",
+          "> 3000",
+          ">= 3000",
+          "96 MiB",
+          "/tmp/window-2m.ndjson",
+          "7b31c2a",
+          "10,000 events"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": {
+        "text": "{\n  \"next\": \"run `npm test -- --run tests/window/maxDistinct.test.ts`\",\n  \"rollback\": \"restore commit 7b31c2a (correct only for unique-user input)\",\n  \"uncertainty\": \"Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug. malformed negative timestamps: throw or skip?\",\n  \"reconsider\": \"reconsider per-window sorting only if input limit < 10,000 events\"\n}",
+        "finishReason": "stop",
+        "usage": {
+          "completion_tokens": 107,
+          "prompt_tokens": 566,
+          "total_tokens": 673,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          }
+        },
+        "latencyMs": 1842,
+        "parsed": {
+          "next": "run `npm test -- --run tests/window/maxDistinct.test.ts`",
+          "rollback": "restore commit 7b31c2a (correct only for unique-user input)",
+          "uncertainty": "Unicode-normalized user ids might compare unequal; normalization outside contract, not confirmed bug. malformed negative timestamps: throw or skip?",
+          "reconsider": "reconsider per-window sorting only if input limit < 10,000 events"
+        },
+        "checks": {
+          "next": true,
+          "rollback": true,
+          "uncertainty": true,
+          "reconsider": false
+        },
+        "passed": false
+      }
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "heldout-cache-migration",
+      "split": "heldout",
+      "sourceChars": 2002,
+      "maxTokens": 501,
+      "text": "F: Redis-to-PostgreSQL session migration.\nC: Redis prefix: sess:v3:; PG table: auth.session_v4.\nF: 12,480,331 live keys at 02:00 UTC sample.\nF: 0.06% lack user_agent; schema permits NULL; not migration failures.\nC: Max 4,000 writes/s to PG; replication lag < 4 s; login error rate <= 0.8%.\nX: SCAN COUNT 10000 with 32 workers; staging hit 11,700 writes/s, lag 19 s; rejected.\nD: Reconsider 32 workers only if DB team raises write cap > 12,000 writes/s and prod load test confirms lag < 4 s.\nX: KEYS sess:v3:*; blocked Redis 6.2 s; never use KEYS in production.\nD: SCAN COUNT 500 with 6 workers; token bucket cap 3,500 writes/s; checkpoint every 50,000 keys in /var/lib/auth-migrate/checkpoint.json.\nD: Run shadow reads first.\nF: Start command: `/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 3500 --shadow`.\nD: After 30 minutes, compare SHA-256 over canonical records for 25,000-key sample.\nU: Lua-created sessions may not preserve millisecond precision; verify rather than assume.\nC: Promote PG reads only if mismatch < 0.02%, p99 read latency < 35 ms, login errors < 0.8% for 20 consecutive minutes.\nR: Abort immediately if lag >= 4 s or write rate > 4,000/s.\nR: Rollback: set feature flag auth.session-read-v4=false; do not delete auth.session_v4 for 7 days.\nO: Should expired keys encountered after SCAN be counted as mismatches?\nN: Execute `/opt/auth/bin/migrate-sessions --prefix sess:v3: --workers 6 --rate 3500 --shadow`.\nF: Success requires all promotion gates to pass, not just copy completion.\nD",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 501,
+        "prompt_tokens": 782,
+        "total_tokens": 1283,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7049,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1527,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2357,
+      "storedSessionBytes": 2357,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days"
+        ],
+        "required": [
+          "sess:v3:",
+          "auth.session_v4",
+          "12,480,331",
+          "02:00 UTC",
+          "0.06%",
+          "4,000 writes/s",
+          "4 s",
+          "0.8%",
+          "11,700 writes/s",
+          "19 s",
+          "SCAN COUNT 500",
+          "6 workers",
+          "3,500 writes/s",
+          "50,000 keys",
+          "/var/lib/auth-migrate/checkpoint.json",
+          "25,000-key",
+          "0.02%",
+          "35 ms",
+          "7 days",
+          "AUTH-209"
+        ],
+        "rate": 0.95
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "heldout-certificate-rotation",
+      "split": "heldout",
+      "sourceChars": 2010,
+      "maxTokens": 503,
+      "text": "F: Rotating internal mTLS issuer after near-expiry alert.\nC: Old issuer fingerprint SHA256:4A:19:7C:EE; expires 2026-08-12T03:00:00Z.\nC: New issuer fingerprint SHA256:91:B0:2D:6F; stored at /etc/pki/mesh/issuer-next.pem.\nC: 43 legacy agents before v5.4.2 do not support dual trust bundle.\nF: Replaced bundle on canary edge-07; caused 14.2% handshake failures because leaf certificate chained only to old issuer; restore completed in 38 s.\nD: Trust must roll out before identity; do not repeat single-step replacement.\nX: Single-step replacement failed; reconsider only when zero agents older than v5.4.2 remain.\nC: Disabling certificate verification for five minutes is forbidden even during rollback.\nD: Order: append new issuer without removing old; verify; issue dual-compatible leaves; verify again; remove old issuer last.\nC: First command: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Do not remove `--check` on first run.\nO: Success gate after trust append: 10,000 synthetic handshakes; zero unknown_ca errors; p99 below 120 ms.\nU: 43 legacy agents may require restart; uncertain until test agent legacy-12 reconnects.\nR: Abort if unknown_ca exceeds 0.1% or any node reports clock skew above 2 s.\nR: Rollback before leaf issuance: restore /etc/pki/mesh/ca-bundle.pem.bak.\nR: Rollback after leaf issuance: re-add both issuers and reissue old-chain leaves; removing only new issuer strands new leaves.\nO: Maintenance approval SEC-144 permits restarts but may not permit firmware updates.\nN: Next action: `ansible-playbook -i inventories/prod rotate-trust.yml --limit edge-canary --check`.\nC: Keep old issuer until metric mesh_old_chain_connections is zero for 24 consecutive hours.\nX: Reconsider old-issuer removal only after metric gate and SEC-14",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 503,
+        "prompt_tokens": 738,
+        "total_tokens": 1241,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 7052,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1796,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2365,
+      "storedSessionBytes": 2365,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "required": [
+          "SHA256:4A:19:7C:EE",
+          "2026-08-12T03:00:00Z",
+          "SHA256:91:B0:2D:6F",
+          "/etc/pki/mesh/issuer-next.pem",
+          "43 legacy agents",
+          "v5.4.2",
+          "edge-07",
+          "14.2%",
+          "38 s",
+          "10,000 synthetic handshakes",
+          "120 ms",
+          "legacy-12",
+          "0.1%",
+          "2 s",
+          "/etc/pki/mesh/ca-bundle.pem.bak",
+          "SEC-144",
+          "24 consecutive hours"
+        ],
+        "rate": 1
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    },
+    {
+      "candidate": "typed-surface",
+      "ratio": 1,
+      "traceId": "heldout-inference-choice",
+      "split": "heldout",
+      "sourceChars": 2187,
+      "maxTokens": 547,
+      "text": "F: model atlas-34b; 1x RTX 6000 Ada (48 GiB)\nC: interactive 70% (1,200 in, 180 out); batch 30% (8,000 in, 600 out)\nC: interactive p95 TTFT < 900 ms; ≥ 18 tokens/s/request; no OOM in 60-min soak\nF: fp16 used 67.4 GiB; cannot fit\nF: q8 used 39.8 GiB; TTFT 1,140 ms; 26.1 tokens/s\nF: q4_k_m used 25.6 GiB; TTFT 712 ms; 22.7 tokens/s\nF: speculative q4_k_m+draft used 31.2 GiB; TTFT 804 ms; 31.5 tokens/s; crashed after 47 min (CUDA error 700)\nD: favored speculative (highest throughput)\nX: speculative violates soak gate; not deployable\nX: lowered draft length 8→4; no crash in 20 min; insufficient evidence; not fixed\nC: reconsider speculative only after three 60-min soaks with zero CUDA errors\nD: provisional: q4_k_m without draft\nN: `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`\nC: do not increase concurrency > 6 until KV usage < 44 GiB\nR: if deployed, set ATLAS_PROFILE=q8; restart one replica at a time; q8 misses TTFT gate but is stable fallback\nR: abort q4 soak if GPU memory > 44 GiB; ECC errors > 0; interactive p95 > 900 ms for 5 consecutive minutes\nU: q4 quality on Finnish legal queries may regress; 240-query set not scored\nO: can continuous batching reduce q8 TTFT without breaking batch fairness?\nO: success requires all hard gates + ≤ 0.7 percentage-point quality loss on evals/fi-legal-240.jsonl\nN: `./bench-atlas --profile q4_k_m --concurrency 6 --duration 60m --json /tmp/atlas-q4-soak.json`\nC: reconsider q8 as primary only if batching brings TTFT < 90",
+      "finishReason": "length",
+      "usage": {
+        "completion_tokens": 547,
+        "prompt_tokens": 856,
+        "total_tokens": 1403,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "latencyMs": 8050,
+      "complete": false,
+      "runtimeAccepted": false,
+      "outputChars": 1519,
+      "thinkingReduction": 0,
+      "originalSessionBytes": 2542,
+      "storedSessionBytes": 2542,
+      "wholeSessionReduction": 0,
+      "exactRetention": {
+        "retained": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "30%",
+          "900 ms",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "required": [
+          "atlas-34b",
+          "RTX 6000 Ada",
+          "48 GiB",
+          "70%",
+          "1,200 input tokens",
+          "180 output tokens",
+          "30%",
+          "8,000 input",
+          "600 output",
+          "900 ms",
+          "18 output tokens/s",
+          "60-minute soak",
+          "67.4 GiB",
+          "39.8 GiB",
+          "1,140 ms",
+          "26.1 tokens/s",
+          "25.6 GiB",
+          "712 ms",
+          "22.7 tokens/s",
+          "31.2 GiB",
+          "804 ms",
+          "31.5 tokens/s",
+          "47 minutes",
+          "CUDA error 700",
+          "44 GiB",
+          "0.7 percentage-point",
+          "evals/fi-legal-240.jsonl"
+        ],
+        "rate": 0.7407407407407407
+      },
+      "instructionLeakage": [],
+      "continuation": null
+    }
+  ]
+}

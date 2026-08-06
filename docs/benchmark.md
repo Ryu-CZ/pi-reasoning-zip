@@ -1,105 +1,166 @@
-# Benchmark
+# Prompt benchmark
 
 ## Environment
 
-The benchmark ran on 2026-08-05 with:
+The comparative run was performed on 2026-08-05 with:
 
 - Pi `0.83.0`;
-- the `pi-reasoning-zip` checkout after commit `8059fc3`;
-- local `Qwen3.6-27B-UD-Q4_K_XL.gguf` served by llama.cpp;
-- a 73,728-token context with three unified-KV slots; and
-- the same model alias (`unsloth`) for main generation and compaction.
+- local `Qwen3.6-27B-UD-Q4_K_XL.gguf` served as `unsloth` by llama.cpp;
+- a 73,728-token context and three unified-KV slots;
+- compaction pinned to slot 1, temperature `0.1`, seed `3407`, and model-side thinking disabled;
+- `thresholds.maxTraceChars: 2000` for this historical comparison; and
+- the same exact source string for every prompt candidate.
 
-This rerun deliberately replaced an earlier run that accidentally used the ThinkingCap model variant. Performance figures describe this host and configuration, not general throughput.
+The previous five-task benchmark established fail-open behavior and exposed the old token-budget problem, but it did not compare prompts or test independent continuation. The results below supersede it for prompt selection.
 
-## Methodology
+## Sources and reproducibility
 
-Five reasoning-heavy prompts were generated in fresh, isolated core-Pi sessions. The baseline loaded no extensions and disabled tools, skills, prompt templates, and context files. Each exact baseline thinking block was then sent to the current compactor prompt. This exact-source comparison avoids mixing model-sampling variance with compression.
+The committed harness and inputs are:
 
-The compaction run used:
+- [`scripts/benchmark-prompts.mjs`](../scripts/benchmark-prompts.mjs);
+- [`benchmarks/prompt-comparison/traces.json`](../benchmarks/prompt-comparison/traces.json): six tuning traces, three development and three evaluation;
+- [`benchmarks/prompt-comparison/heldout-traces.json`](../benchmarks/prompt-comparison/heldout-traces.json): three blind confirmation traces written after the final candidate was fixed;
+- [`benchmarks/prompt-comparison/final-winner-results.json`](../benchmarks/prompt-comparison/final-winner-results.json);
+- [`benchmarks/prompt-comparison/final-budget-sweep.json`](../benchmarks/prompt-comparison/final-budget-sweep.json); and
+- [`benchmarks/prompt-comparison/true-heldout-core-results.json`](../benchmarks/prompt-comparison/true-heldout-core-results.json).
 
-```json
-{
-  "compactor": {
-    "maxCompactionRatio": 0.75,
-    "temperature": 0.1
-  },
-  "thresholds": {
-    "minChars": 400,
-    "maxInputChars": 20000,
-    "maxTraceChars": 2000
-  }
-}
+The traces are deliberately dense, hand-authored reasoning-state records rather than independently sampled model generations. Together they contain exact paths, commands, identifiers, numbers, units, negation, exceptions, uncertainty, causal order, failed attempts and evidence, reconsideration conditions, rollback and abort rules, open questions, success gates, and next actions. Hand-authorship makes required state auditable; it does not reproduce the distribution of natural model reasoning.
+
+Run the selected prompt and its ratio sweep against the intended local endpoint:
+
+```bash
+ESTIMATED_CHARS_PER_TOKEN=3 \
+MAX_TRACE_CHARS=2000 \
+COMPACTION_CANDIDATES=typed-surface-safe2-reconsider \
+COMPACTION_RATIOS=1 \
+node scripts/benchmark-prompts.mjs \
+  benchmarks/prompt-comparison/traces.json \
+  benchmarks/prompt-comparison/final-winner-results.json
+
+ESTIMATED_CHARS_PER_TOKEN=3 \
+MAX_TRACE_CHARS=2000 \
+COMPACTION_CANDIDATES=typed-surface-safe2-reconsider \
+COMPACTION_RATIOS=0.25,0.5,0.75 \
+node scripts/benchmark-prompts.mjs \
+  benchmarks/prompt-comparison/traces.json \
+  benchmarks/prompt-comparison/final-budget-sweep.json
 ```
 
-`minChars: 400` deliberately tests aggressive coverage; the built-in default remains 1,000. One generated trace was only 191 characters and was therefore skipped under either threshold. Exact-source compactor requests used slot 1; the separate live check pinned main traffic to slot 0.
+Run the frozen blind comparison:
+
+```bash
+ESTIMATED_CHARS_PER_TOKEN=3 \
+MAX_TRACE_CHARS=2000 \
+COMPACTION_CANDIDATES=typed,terse,surface,typed-surface-safe2-reconsider \
+COMPACTION_RATIOS=1 \
+node scripts/benchmark-prompts.mjs \
+  benchmarks/prompt-comparison/heldout-traces.json \
+  benchmarks/prompt-comparison/true-heldout-core-results.json
+```
+
+The harness records raw responses, finish reasons, usage, latency, strict required-span retention, direct failed-attempt evidence/rationale checks, canary/prompt leakage, runtime acceptance, projected JSONL bytes, and an independent continuation request that receives only the compact note. A continuation passes only when it recovers the exact next-action command. Character and canonical JSONL reductions use the original whenever runtime validation rejects an output, matching production fail-open behavior.
+
+## Core candidates
+
+Four candidates received the identical blind sources and budget:
+
+- **Typed**: the previous F/C/D/X/U/R/O/N lossless-state ledger.
+- **Terse**: the same compression task with only `Answer concisely.` as its style instruction.
+- **Surface**: a Caveman-inspired surface-deletion policy without typed state categories.
+- **Selected hybrid**: typed ledger plus selective surface deletion, explicit source-instruction omission, and preservation of source-stated reconsideration conditions.
+
+The surface policy was independently worded from general principles. It was inspired by [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) at commit `ec83e5b`; Caveman is MIT-licensed, copyright 2026 Julius Brussee. No substantial Caveman prompt text is copied here. Caveman itself targets concise assistant output, not reasoning-state compaction, so this benchmark does not claim its upstream results apply to this extension.
+
+## Blind held-out result
+
+All figures below are from the three frozen held-out traces at ratio `1.0` with the three-characters-per-token estimator.
+
+| Candidate | Complete | Runtime accepted | Strict spans | Dead-end checks | Leakage canaries | Exact next action | Stored-thinking reduction | Mean latency |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Previous typed ledger | 3/3 | 0/3 | 75/75 | 8/9 | 2/3 | 3/3 | 0.0% | 12.55 s |
+| Plain terse control | 3/3 | 2/3 | 34/75 | 2/9 | 1/3 | 1/3 | 30.0% | 9.34 s |
+| Caveman-inspired surface policy | 3/3 | 3/3 | 68/75 | 6/9 | 3/3 | 2/3 | 22.5% | 6.40 s |
+| **Selected hybrid** | **3/3** | **2/3** | **75/75** | **9/9** | **0/3** | **3/3** | **14.4%** | **6.00 s** |
+
+The plain terse control often returned `none`; its small storage figure is therefore not evidence for useful generic brevity. The surface candidate was shortest and always accepted, but it lost exact spans, emitted source canaries, and failed one independent next-action recovery. It was rejected despite the best compression.
+
+The previous typed prompt retained all required spans but produced 2,037–2,161 characters. All three outputs exceeded this comparison's independent 2,000-character storage limit, so that configuration would preserve every original. The selected hybrid produced complete responses for all three. Two outputs were accepted; the dense parser ledger was 2,201 characters and was correctly rejected without raising `maxTraceChars`.
 
 ## Budget calibration
 
-The lossless-ledger prompt needs enough room to finish before output acceptance checks can run. A truncated response is rejected even if its partial text looks short.
+The final prompt was swept over the six tuning traces using the production three-characters-per-token estimate:
 
-| `maxCompactionRatio` | Complete eligible responses | Runtime result |
-|---:|---:|---|
-| `0.25` | 0 of 4 | All four eligible responses hit the token limit |
-| `0.35` | 0 of 4 | All four eligible responses hit the token limit |
-| `0.50` | 0 of 4 | All four eligible responses hit the token limit |
-| `0.75` | 4 of 4 | Three stored; one complete output exceeded `maxTraceChars` and was rejected |
-| `1.00` | 4 of 4 | Same outputs and acceptance result as `0.75` |
+| `maxCompactionRatio` | Complete responses | Runtime accepted |
+|---:|---:|---:|
+| `0.25` | 0/6 | 0/6 |
+| `0.50` | 0/6 | 0/6 |
+| `0.75` | 3/6 | 3/6 |
+| `1.00` | 6/6 | 6/6 |
 
-This confirms that the former `0.25` default was too restrictive for the current lossless-ledger prompt. The default is now `0.75`: it leaves generation headroom while validation still requires completed output that is non-empty, strictly shorter than the source, and within `maxTraceChars`. Raising the budget did not force larger results in this run; completed outputs were identical at `0.75` and `1.00`.
+The old `C / 4` estimate and `0.75` default left every typed and surface-policy response truncated at the 0.75 setting. Dense paths, punctuation, and code tokenize above the common four-characters-per-token heuristic. Production now estimates `ceil(C / 3)` and defaults the ratio to `1.0`. This increases generation headroom, not accepted storage: output must still complete, be non-empty, and be strictly shorter than the source. This historical sweep also enabled a 2,000-character `maxTraceChars` guardrail; the current default is `-1` (disabled).
 
-## Storage and retention results
+## Retention and storage effect
 
-| Task | Original thinking | Stored thinking | Change | Result |
-|---|---:|---:|---:|---|
-| Incident rollback plan | 1,504 chars | 838 chars | -44.3% | Exact path, versions, rates, command, migration rule, lag threshold, uncertainty, and next action retained |
-| Double-charge debugging | 5,001 chars | 5,001 chars | 0% | Complete 3,846-character ledger exceeded `maxTraceChars: 2000`; original preserved |
-| Sliding-window algorithm | 2,002 chars | 984 chars | -50.8% | Algorithm, inclusive boundary, memory constraint, correctness argument, deduplication, and incorrect approaches retained |
-| Redis-to-PostgreSQL migration | 191 chars | 191 chars | 0% | Below `minChars: 400`; no compactor request |
-| Inference-service decision | 3,293 chars | 1,162 chars | -64.7% | Hard constraints, all option/workload values, decision, batching uncertainty, TTFT risk, and next action retained |
-| **Total** | **11,991 chars** | **8,176 chars** | **-31.8%** | Three traces compacted; two originals safely preserved |
+On the six tuning traces, the selected prompt completed and was accepted 6/6, retained 103/112 strict source spans and 15/16 direct dead-end evidence/rationale checks, emitted zero canaries, and recovered the exact next action 6/6. Manual source comparison found that the nine strict misses were surface normalization rather than changed values—such as `1,200 in` for `1,200 input tokens`—except for one corrected, no-longer-true guess (`v2.18.0`) that was omitted. All marked decision-relevant paths, commands, identifiers, and numeric values remained semantically intact, as did the reviewed negation/exception rules, uncertainties, failed-attempt rationales, stated reconsideration conditions, rollback/abort rules, open questions, causal ordering, and next actions. Corrected discarded values such as the wrong `v2.18.0` guess and wrong path spelling were not retained. No unsupported claim strengthening was found.
 
-The three accepted traces shrank from 6,799 to 2,984 characters (-56.1%). The built-in 1,000-character threshold produces the same stored result for this sample: it targets the four substantive traces, while the 191-character planning note remains untouched.
+The frozen held-out set retained 75/75 strict spans and all 9/9 direct dead-end evidence/rationale checks. Manual review likewise found no strengthened claim or lost negation, uncertainty, dead-end rationale, rollback rule, reconsideration rule, or next action. The rejected 2,201-character parser output also retained 23/23 spans and the correct continuation state; fail-open storage intentionally used its original source.
 
-Manual comparison found no source fact strengthened or lost in the three accepted outputs. The double-charge output also completed and retained its detailed state, but the independent 2,000-character storage bound intentionally rejected it. Increasing `maxTraceChars` would recover its 23.1% reduction at the cost of allowing larger stored ledgers.
+| Set | Source thinking | Stored thinking | Change | Canonical JSONL bytes | Change |
+|---|---:|---:|---:|---:|---:|
+| Tuning (6) | 12,687 chars | 9,612 chars | -24.2% | 14,817 -> 11,858 | -20.0% |
+| Frozen held-out (3) | 6,893 chars | 5,901 chars | -14.4% | 7,958 -> 6,998 | -12.1% |
+| **Combined (9)** | **19,580 chars** | **15,513 chars** | **-20.8%** | **22,775 -> 18,856** | **-17.2%** |
 
-## Whole-session storage effect
+The canonical JSONL projection serializes a fixed session header, user message, assistant thinking block, and final text, then substitutes only accepted thinking. It measures whole serialized test sessions, not provider billing or a natural multi-turn Pi workload.
 
-To measure more than the thinking blocks, each accepted compact string was substituted into a copy of its exact baseline JSONL session. All headers, prompts, final answers, usage metadata, and rejected or ineligible thinking remained byte-for-byte unchanged.
+The nine selected-prompt compactions took 60.5 seconds total (6.7 seconds mean) on this host. Independent continuation probes were separate benchmark requests and are not included in that latency. Compaction delays message finalization; savings benefit later replayed turns.
 
-| Task | Baseline JSONL | Projected compact JSONL | Change |
-|---|---:|---:|---:|
-| Incident rollback plan | 6,689 bytes | 6,000 bytes | -10.3% |
-| Double-charge debugging | 22,417 bytes | 22,417 bytes | 0% |
-| Sliding-window algorithm | 11,702 bytes | 10,669 bytes | -8.8% |
-| Redis-to-PostgreSQL migration | 2,099 bytes | 2,099 bytes | 0% |
-| Inference-service decision | 11,084 bytes | 8,897 bytes | -19.7% |
-| **Total** | **53,991 bytes** | **50,082 bytes** | **-7.2%** |
+## Live high-reasoning stress check
 
-Whole-session savings are smaller than the 31.8% thinking reduction because user prompts, final answers, session headers, and metadata are not compacted. The 7.2% figure is an exact serialized replacement for these five one-turn files, but it is still projected rather than five independently generated treatment sessions; that preserves a controlled, identical source outside the thinking strings.
+The prompt-selection comparison above deliberately uses identical hand-authored sources. To see how the selected production compactor behaves on longer model-generated reasoning, a separate two-run check used [`scripts/high-reasoning-zip.mjs`](../scripts/high-reasoning-zip.mjs). The runner generated three difficult tasks sequentially on main slot 0, captured `message.reasoning_content`, and compacted that captured text on slot 1 using the production selected prompt, `ceil(C / 3)` budget at ratio `1`, and an explicitly configured 2,000-character acceptance cap. It does **not** compare prompt candidates or establish semantic retention as rigorously as the exact-source benchmark.
 
-## Live extension and slot check
+The local llama.cpp server used `--reasoning on --reasoning-preserve --reasoning-budget 8192`, a 53,284-token unified context, and three slots. Each main request sent `thinking_budget_tokens: 8192`, `max_tokens: 10000`, `temperature: 0.1`, and seed `3407`; compactor requests sent `thinking_budget_tokens: 0`, `temperature: 0.1`, and used slot 1. The two runs were sequential to avoid slot-contention timing effects:
 
-A separate isolated Pi run loaded only this checkout's extension with `maxCompactionRatio: 0.75` and `llamaCppSlots.enabled: "auto"`. The finalized session stored a 945-character incident ledger. Immediately after the run, llama.cpp reported:
+```bash
+npm run build
+MAX_TRACE_CHARS=2000 node scripts/high-reasoning-zip.mjs benchmarks/high-reasoning/run-1.json
+MAX_TRACE_CHARS=2000 node scripts/high-reasoning-zip.mjs benchmarks/high-reasoning/run-2.json
+node scripts/summarize-high-reasoning.mjs
+```
 
-| Slot | Request | Shape |
-|---:|---|---|
-| 0 | Main Pi generation | streaming, temperature 0.59375, 4,400-token limit |
-| 1 | Reasoning compactor | non-streaming, temperature 0.1, 322-token ratio-derived limit |
+Raw responses and the aggregate are kept under [`benchmarks/high-reasoning/`](../benchmarks/high-reasoning/): [`run-1.json`](../benchmarks/high-reasoning/run-1.json), [`run-2.json`](../benchmarks/high-reasoning/run-2.json), and [`summary.json`](../benchmarks/high-reasoning/summary.json).
 
-This verifies the real hook path, current ratio budget, and separate-slot routing on the present three-slot server. It is a post-run slot-state observation, not continuous sampling of the entire request lifetime.
+| Aggregate | Reasoning source | Production stored thinking | Reduction | Runtime accepted | Mean generation latency | Mean compaction latency |
+|---|---:|---:|---:|---:|---:|---:|
+| Run 1 (3) | 27,106 chars | 4,647 chars | -82.9% | 3/3 | 35.9 s | 6.3 s |
+| Run 2 (3) | 31,319 chars | 15,732 chars | -49.8% | 2/3 | 39.4 s | 6.3 s |
+| **Pooled (6)** | **58,425 chars** | **20,379 chars** | **-65.1%** | **5/6** | **37.7 s** | **6.3 s** |
 
-## Timing observations
+The mean of the two run-level reductions is **-66.3%**. The pooled number is lower because run 2 contained a 2,418-character compact result, which production rejected and therefore stored as its 13,324-character original. Across task markers that actually appeared in the generated reasoning, compact notes retained 29/34. That is only a lightweight literal check: generated reasoning may omit task input, and neither it nor the marker score proves complete preservation, absence of claim strengthening, or continuation quality. Inspect raw responses before using this as a retention claim.
 
-The five fresh main generations took 2.0–61.0 seconds each. The four eligible `0.75` compactor requests took 3.1–9.0 seconds each, 20.1 seconds total. These are host-specific wall-clock observations. Compaction adds latency to message finalization; its benefit appears on later turns through reduced stored context.
+## Iteration record
+
+Each iteration changed one prompt dimension from a named predecessor and reused exact sources:
+
+| Variant | Change | Concrete result and disposition |
+|---|---|---|
+| Typed baseline | Existing ledger | Strong strict retention, but frequent truncation/over-limit outputs and framed source canaries. |
+| Surface | Replace typed schema with selective surface deletion | Better compression, weaker exact/continuation retention, canary quotations; rejected. |
+| Typed + surface | Add surface deletion to typed baseline | Improved completion while retaining state, but quoted framed canaries; retained for refinement. |
+| Explicit size target | Add 50–60% character target | Model often exceeded the requested target; no reliable 0.75-budget completion gain; rejected. |
+| Source-instruction omission | Omit quoted/described source instructions | Removed canaries, but one tuning trace lost a stated speculative-profile reconsideration condition. |
+| Broad alternative rule | Require a reconsideration rule for every rejected option | Invented a reconsideration condition not present in one source; rejected. |
+| Source-stated reconsideration rule | Preserve only conditions actually stated | Restored the missing rule without requiring invention, but one framed canary survived. |
+| **Selected hybrid** | Strengthen only source-instruction elision | Zero canaries on tuning and frozen held-out sets, all stated reconsideration rules retained, all next actions recoverable. |
+
+Raw intermediate rounds remain under `benchmarks/prompt-comparison/` so these diagnoses are auditable.
 
 ## Limitations
 
-- Five tasks are enough to catch the token-budget regression but not to establish a universal compression rate.
-- Baseline reasoning length and substance vary across independent generations.
-- Character-to-token estimation is approximate.
-- The primary comparison measures stored thinking; the whole-session table measures JSONL bytes, but neither measures provider billing or long-context time-to-first-token.
-- Retention review is manual and limited to state present in each baseline thinking block.
-- Results are specific to this prompt, model, server, and host.
-
-After the benchmark, the isolated automated suite passed 86 of 86 tests.
+- Six tuning and three held-out traces are substantially stronger coverage than the old five-task benchmark, but still too small for universal rates. The held-out sources were written after selection was fixed, but artifacts are introduced together in this change, so that freeze chronology is procedural rather than independently cryptographically verifiable.
+- Inputs are synthetic state-dense traces. Natural local-model reasoning may be less structured, more repetitive, multilingual, or much longer.
+- Only one local model, quantization, temperature, server, and host were tested. The two sequential high-reasoning runs varied even with a fixed seed; two runs illustrate variance but do not characterize it.
+- Strict span matching is conservative about harmless wording and unit normalization. Direct dead-end checks cover specific failed-attempt evidence/rationale spans, while the continuation probe only gates exact next-action recovery; manual review remains necessary and is not blinded or independently replicated.
+- The continuation probe uses the same local model family and checks the exact next action. Its additional rollback/uncertainty/reconsideration fields are diagnostic, not the pass criterion, because several notes contain multiple valid rollback or reconsideration rules.
+- Leakage checks use one canary across several phrasings plus a short prompt-phrase list and manual review; they do not cover arbitrary adversarial inputs. The source remains untrusted and downstream models must still treat stored reasoning as data.
+- The historical comparisons and high-reasoning stress check explicitly used `maxTraceChars: 2000`. Dense but faithful outputs can fail open under such an enabled guardrail, as one high-reasoning result did at 2,418 characters; the current default is `-1` (disabled).

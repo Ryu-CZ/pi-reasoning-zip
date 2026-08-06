@@ -89,6 +89,29 @@ describe("compactAssistantMessage", () => {
     expect(result.changed).toBe(false);
   });
 
+  it("stores a shorter result above a disabled size cap", async () => {
+    const uncappedSettings = resolveReasoningZipSettings({ mode: "all", thresholds: { minChars: 5, maxTraceChars: -1 } });
+    const original = "x".repeat(200);
+    const compact = "y".repeat(150);
+    const result = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: original }] },
+      uncappedSettings,
+      async () => compact,
+    );
+    expect(result.changed).toBe(true);
+    expect((result.message.content as any[])[0].thinking).toBe(compact);
+  });
+
+  it("preserves the original above an enabled size cap", async () => {
+    const original = "x".repeat(200);
+    const result = await compactAssistantMessage(
+      { role: "assistant", content: [{ type: "thinking", thinking: original }] },
+      settings,
+      async () => "y".repeat(150),
+    );
+    expect(result.changed).toBe(false);
+  });
+
   it("skips user, tool, and custom messages", async () => {
     for (const role of ["user", "tool", undefined]) {
       const message = { role, content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
@@ -127,13 +150,11 @@ describe("compactAssistantMessage", () => {
     }
   });
 
-  it("skips thinking over the configured compactor input limit", async () => {
-    const limited = resolveReasoningZipSettings({ mode: "all", thresholds: { minChars: 5, maxInputChars: 10 } });
-    let called = false;
+  it("leaves a block unchanged when the compactor skips it", async () => {
     const message = { role: "assistant", content: [{ type: "thinking", thinking: "abcdefghijklmnopqrstuvwxyz" }] };
-    const result = await compactAssistantMessage(message, limited, async () => { called = true; return "zip"; });
+    const result = await compactAssistantMessage(message, settings, async () => undefined);
     expect(result.changed).toBe(false);
-    expect(called).toBe(false);
+    expect(result.message).toBe(message);
   });
 
   it("compacts llama.cpp reasoning_content blocks", async () => {

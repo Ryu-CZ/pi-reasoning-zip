@@ -1,7 +1,7 @@
 import type { PiMessage, PiMessageBlock, ReasoningZipSettings } from "./types.js";
 import { shouldHandleMessage } from "./target.js";
 
-export type CompactText = (thinking: string) => Promise<string>;
+export type CompactText = (thinking: string) => Promise<string | undefined>;
 
 function isThinkingBlock(block: PiMessageBlock): block is PiMessageBlock & { thinking: string } {
   return block.type === "thinking" && typeof block.thinking === "string";
@@ -23,8 +23,7 @@ function hasOpaqueReasoningMetadata(block: PiMessageBlock): boolean {
 function isCompactableThinkingBlock(block: PiMessageBlock, settings: ReasoningZipSettings): block is PiMessageBlock & { thinking: string } {
   return isThinkingBlock(block)
     && !hasOpaqueReasoningMetadata(block)
-    && block.thinking.length >= settings.thresholds.minChars
-    && block.thinking.length <= settings.thresholds.maxInputChars;
+    && block.thinking.length >= settings.thresholds.minChars;
 }
 
 export function hasCompactionCandidate(message: PiMessage, settings: ReasoningZipSettings): boolean {
@@ -32,11 +31,12 @@ export function hasCompactionCandidate(message: PiMessage, settings: ReasoningZi
   return message.content.some((block) => isCompactableThinkingBlock(block, settings));
 }
 
-function acceptableCompaction(original: string, compacted: string, settings: ReasoningZipSettings): string | undefined {
+function acceptableCompaction(original: string, compacted: string | undefined, settings: ReasoningZipSettings): string | undefined {
+  if (compacted === undefined) return undefined;
   const text = compacted.trim();
   if (!text || text === "none") return undefined;
   if (text.length >= original.length) return undefined;
-  if (text.length > settings.thresholds.maxTraceChars) return undefined;
+  if (settings.thresholds.maxTraceChars >= 0 && text.length > settings.thresholds.maxTraceChars) return undefined;
   return text;
 }
 

@@ -161,10 +161,10 @@ describe("extension entrypoint", () => {
 
     expect(result).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith("http://global.test/v1/chat/completions", expect.anything());
-    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const request = fetchMock.mock.calls.find(([url]) => url === "http://global.test/v1/chat/completions")?.[1] as RequestInit;
     const body = JSON.parse(String(request.body)) as { model: string; max_tokens: number };
     expect(body.model).toBe("global-model");
-    expect(body.max_tokens).toBe(4);
+    expect(body.max_tokens).toBe(5);
   });
 
   it("message_end applies nested project overrides while inheriting sibling global settings", async () => {
@@ -189,11 +189,10 @@ describe("extension entrypoint", () => {
     );
 
     expect(result.message.content[0].thinking).toBe("project zip");
-    const [url, init] = fetchMock.mock.calls[0];
+    const [, init] = fetchMock.mock.calls.find(([url]) => url === "http://global.test/v1/chat/completions")!;
     const body = JSON.parse(String((init as RequestInit).body)) as { model: string; max_tokens: number };
-    expect(url).toBe("http://global.test/v1/chat/completions");
     expect(body.model).toBe("project-model");
-    expect(body.max_tokens).toBe(4);
+    expect(body.max_tokens).toBe(5);
   });
 
   it("message_end returns undefined when unchanged", async () => {
@@ -521,6 +520,7 @@ describe("extension entrypoint", () => {
     const handlers = loadExtension();
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: "unsloth", meta: { n_ctx: 53504 } }] }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
     const notifications: string[] = [];
     const notify = (message: string) => notifications.push(message);
@@ -535,7 +535,7 @@ describe("extension entrypoint", () => {
     const recovered = await handlers.get("message_end")!({ message }, nextCtx);
 
     expect(recovered.message.content[0].thinking).toBe("zip");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(notifications).toEqual([]);
   });
 
@@ -826,6 +826,7 @@ describe("extension entrypoint", () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 0 }, { id: 1 }, { id: 2 }] } as Response)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [{ id: "unsloth", meta: { n_ctx: 53504 } }] }) } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ choices: [{ message: { content: "zip" } }] }) } as Response);
 
     // before_provider_request probes and pins.
@@ -841,7 +842,7 @@ describe("extension entrypoint", () => {
     );
 
     expect(result.message.content[0].thinking).toBe("zip");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(notifications).toEqual([]);
   });
 });

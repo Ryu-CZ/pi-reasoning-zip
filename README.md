@@ -40,18 +40,20 @@ It is usually not useful for hosted closed models that expose only opaque or alr
 
 ## Results
 
-A fresh controlled five-task local benchmark used `Qwen3.6-27B-UD-Q4_K_XL.gguf` and sent each exact source trace to the current lossless-ledger prompt. This isolates storage reduction from independent generation variance.
+A controlled prompt comparison on local `Qwen3.6-27B-UD-Q4_K_XL.gguf` used identical state-dense reasoning sources for the previous typed ledger, a plain `Answer concisely.` control, a Caveman-inspired surface policy, and the selected hybrid. Three additional traces were frozen before the final blind comparison.
 
-| Task | Original thinking | Stored thinking | Change | Result |
-|---|---:|---:|---:|---|
-| Incident rollback plan | 1,504 chars | 838 chars | -44.3% | Exact facts, command, constraints, uncertainty, and next action retained |
-| Double-charge debugging | 5,001 chars | 5,001 chars | 0% | Complete output exceeded `maxTraceChars`; original preserved |
-| Sliding-window algorithm | 2,002 chars | 984 chars | -50.8% | Algorithm, constraints, proof state, and incorrect approaches retained |
-| Redis-to-PostgreSQL migration | 191 chars | 191 chars | 0% | Below the minimum input threshold; no request made |
-| Inference-service decision | 3,293 chars | 1,162 chars | -64.7% | Constraints, values, decision, uncertainties, and TTFT risk retained |
-| **Total** | **11,991 chars** | **8,176 chars** | **-31.8%** | Three traces compacted; two safely preserved |
+| Prompt on frozen held-out traces | Runtime accepted | Strict spans | Leakage canaries | Exact next action | Thinking reduction |
+|---|---:|---:|---:|---:|---:|
+| Previous typed ledger | 0/3 | 75/75 | 2/3 | 3/3 | 0.0% |
+| Plain terse control | 2/3 | 34/75 | 1/3 | 1/3 | 30.0% |
+| Caveman-inspired surface policy | 3/3 | 68/75 | 3/3 | 2/3 | 22.5% |
+| **Selected hybrid** | **2/3** | **75/75** | **0/3** | **3/3** | **14.4%** |
 
-Ratios from `0.25` through `0.5` truncated every eligible response. `0.75` completed all four eligible responses and is now the built-in default; one complete result was still rejected by the independent 2,000-character storage bound. Substituting accepted traces into the exact baseline JSONL files reduced complete one-turn session storage from 53,991 to 50,082 bytes (-7.2%). These are measured local results, not universal compression rates. See [Benchmark](docs/benchmark.md) for methodology, calibration, whole-session results, retention review, timing, slot verification, and limitations.
+The selected prompt was not the shortest. It won because it retained exact state and supported continuation without quoting source instructions; one faithful 2,201-character output failed open under the historical comparison's configured 2,000-character storage bound. Across six tuning plus three frozen held-out traces, accepted storage reduced thinking by 20.8% and canonical whole-session JSONL bytes by 17.2%.
+
+The token budget now estimates one token per three source characters and defaults `maxCompactionRatio` to `1.0`. In the tuning sweep, ratios `0.25` and `0.5` completed 0/6, `0.75` completed 3/6, and `1.0` completed 6/6. Accepted storage must be shorter than the source; an optional positive `maxTraceChars` guardrail can impose an additional cap.
+
+A separate two-run live high-reasoning check raised llama.cpp's main-model thinking budget to 8,192 tokens. It generated 58,425 characters across six traces; production acceptance stored 20,379 characters (**-65.1% pooled reduction**, **-66.3% mean per run**) and accepted 5/6 results. The rejected 2,418-character compact trace safely preserved its original under that experiment's explicitly configured 2,000-character cap. This is a small local stress test, not a general compression promise. See [Benchmark](docs/benchmark.md) for committed sources, commands, raw results, candidate failures, retention review, timing, high-reasoning setup, provenance, and limitations.
 
 ## Install
 
@@ -160,9 +162,9 @@ See [llama.cpp slot pinning](docs/llama-cpp-slot-pinning.md) for unified versus 
 - Compaction is forward-only: it changes only an eligible assistant message being finalized, never previous or replayed entries.
 - Fail-open compaction preserves original reasoning after endpoint errors, timeouts, invalid output, or unknown payloads, and shows a Pi warning for request failures.
 - Auto slot isolation fails closed: unsafe or ambiguous shared-server topology skips compaction and preserves the original reasoning.
-- The extension skips non-assistant messages, non-array content, blocks outside configured size thresholds, and providers excluded by the selected mode. Tool-call blocks are preserved while eligible thinking blocks in the same message are compacted.
+- The extension skips non-assistant messages, non-array content, blocks below `minChars`, blocks above the automatic compactor-context source limit (or its fallback), and providers excluded by the selected mode. Tool-call blocks are preserved while eligible thinking blocks in the same message are compacted.
 - It skips signed, encrypted, redacted, and provider-opaque reasoning. Pi's `thinkingSignature: "reasoning_content"` is treated as plain llama.cpp reasoning, not an opaque signature.
-- A compact result is rejected when it is empty, `none`, not shorter than the source, or longer than `maxTraceChars`. Inline reasoning wrappers and truncated compactor output are also rejected.
+- A compact result is rejected when it is empty, `none`, not shorter than the source, or when it exceeds a positive `maxTraceChars` guardrail. Inline reasoning wrappers and truncated compactor output are also rejected. The default `maxTraceChars: -1` disables that optional guardrail.
 - It does not reduce hidden provider-side reasoning tokens. It adds a compactor request and may lose secondary detail, especially on short traces.
 - The extension never modifies the main model's system, developer, user, or assistant messages before generation. Its `before_provider_request` hook is used only for optional llama.cpp slot fields.
 
@@ -170,8 +172,8 @@ See [llama.cpp slot pinning](docs/llama-cpp-slot-pinning.md) for unified versus 
 
 | Symptom | Check |
 |---|---|
-| No block was compacted | Confirm the message is from the assistant, has array content, meets `minChars`/`maxInputChars`, and is eligible for the selected `mode`. |
-| Original reasoning was preserved | Check Pi warnings and compactor output. Errors, empty/`none` output, longer output, and output over `maxTraceChars` are rejected. |
+| No block was compacted | Confirm the message is from the assistant, has array content, meets `minChars` and the automatic compactor-context source limit (or fallback), and is eligible for the selected `mode`. |
+| Original reasoning was preserved | Check Pi warnings and compactor output. Errors, empty/`none` output, longer output, and output over an enabled positive `maxTraceChars` guardrail are rejected. |
 | Auto slot mode skips compaction | Verify `GET /slots` succeeds with the compactor API key, reports at least two slots, and configured IDs do not collide after wrapping. |
 | Next llama.cpp turn reprocesses too much prompt | Confirm main and compactor requests use different slots. The first turn after compaction still evaluates the changed suffix by design. |
 | `local-only` skips a custom provider | Confirm Pi exposes it as a local URL provider or `llama-server=` endpoint; otherwise choose a mode that targets it intentionally. |
