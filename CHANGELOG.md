@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Rebuilt the README benchmark section from the latest production-default artifacts, separating automated checks, manual review, host-specific measurements, and limitations while removing the obsolete capped stress-test headline; added a ratio-reliability table, an inline metric note, a complete benchmark glossary, and its raw sweep artifact.
+
 ## [0.7.0] - 2026-08-06
 
 ### Changed

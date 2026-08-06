@@ -49,7 +49,8 @@ The committed harness and inputs are:
 - [`benchmarks/prompt-comparison/traces.json`](../benchmarks/prompt-comparison/traces.json): six tuning traces, three development and three evaluation;
 - [`benchmarks/prompt-comparison/heldout-traces.json`](../benchmarks/prompt-comparison/heldout-traces.json): three blind confirmation traces written after the final candidate was fixed;
 - [`benchmarks/prompt-comparison/final-winner-results.json`](../benchmarks/prompt-comparison/final-winner-results.json);
-- [`benchmarks/prompt-comparison/final-budget-sweep.json`](../benchmarks/prompt-comparison/final-budget-sweep.json); and
+- [`benchmarks/prompt-comparison/final-budget-sweep.json`](../benchmarks/prompt-comparison/final-budget-sweep.json);
+- [`benchmarks/prompt-comparison/ratio-reliability-sweep.json`](../benchmarks/prompt-comparison/ratio-reliability-sweep.json); and
 - [`benchmarks/prompt-comparison/true-heldout-core-results.json`](../benchmarks/prompt-comparison/true-heldout-core-results.json).
 
 The traces are deliberately dense, hand-authored reasoning-state records rather than independently sampled model generations. Together they contain exact paths, commands, identifiers, numbers, units, negation, exceptions, uncertainty, causal order, failed attempts and evidence, reconsideration conditions, rollback and abort rules, open questions, success gates, and next actions. Hand-authorship makes required state auditable; it does not reproduce the distribution of natural model reasoning.
@@ -77,6 +78,27 @@ node scripts/benchmark-prompts.mjs \
 ```
 
 The harness records raw responses, finish reasons, usage, latency, strict required-span retention, direct failed-attempt evidence/rationale checks, canary/prompt leakage, runtime acceptance, projected JSONL bytes, and an independent continuation request that receives only the compact note. A continuation passes only when it recovers the exact next-action command. Character and canonical JSONL reductions use the original whenever runtime validation rejects an output, matching production fail-open behavior.
+
+## Metric glossary
+
+| Metric | Definition | Interpretation |
+|---|---|---|
+| Source trace | The complete fixture reasoning text sent to every candidate. | Candidate comparisons are controlled because they use the identical source string. |
+| Generated output | The compactor response before runtime validation. | It can be incomplete or rejected and therefore may differ from what Pi stores. |
+| Complete | The response finish reason is neither `length` nor `max_tokens`. | Completion is necessary but not sufficient for runtime acceptance. |
+| Runtime accepted | The output completed, contains no inline reasoning wrapper, is neither empty nor `none`, is shorter than its source, and does not exceed an enabled positive `maxTraceChars` guardrail. | Accepted output replaces the source thinking; rejected output does not. |
+| Exact required span | A fixture-defined decision-relevant string from `mustRetain`, such as a command, path, identifier, number, unit, or condition. The check searches the generated output case-insensitively for that otherwise verbatim string. | This is deliberately strict. Equivalent wording such as `1,200 in` does not satisfy the expected `1,200 input tokens`, so a miss requires review but does not by itself prove semantic loss. |
+| Exact spans in generated output | Retained required spans divided by all required spans, aggregated across the tested traces. | For truncated responses this measures partial text only; it does not describe stored session state. |
+| Failed-attempt check | A fixture-defined evidence or rejection-reason string from `deadEndChecks`. | Tests whether compact notes retain not only that an option failed, but decision-relevant evidence or why it must not be retried. |
+| Instruction-leakage canary | A fixture string that imitates an instruction embedded in the source, plus selected benchmark-prompt phrases. | Any match is undesirable because source instructions should be omitted rather than copied into replayable reasoning. |
+| Continuation probe | A separate model request that receives only the generated compact note and must reconstruct structured task state. | It tests whether the note supports continued work without access to the original reasoning. |
+| Exact next action | The continuation probe's `next` field contains the fixture-defined expected next action using the same case-insensitive exact-string check. | This is the continuation pass criterion. It tests operational recovery of the concrete next command, not complete retention of every fact. |
+| Source to stored thinking | Source characters compared with the characters Pi would store. Runtime-accepted output is stored; otherwise the complete original is used. | Mirrors production fail-open behavior. |
+| Stored-thinking reduction | `1 - stored thinking characters / source thinking characters`. | Rejected results contribute 0% because Pi preserves their originals. |
+| Session JSONL reduction | Reduction in a canonical fixed session projection after substituting only the stored thinking block. | Estimates serialized session-size effect, not provider billing or a natural multi-turn workload. |
+| Compaction latency | Wall time of the compactor request. | Excludes the separate continuation probe and is specific to the tested host, server, and model. |
+| Mean latency | Arithmetic mean compaction latency across records in the row. | Useful for local comparison, not a universal performance claim. |
+| Fail-open preservation | When runtime validation rejects output, the benchmark counts the complete original as stored. | Protects session state but yields no compression for that record; it must not be presented as successful compaction. |
 
 ## Core candidates
 
@@ -106,15 +128,23 @@ The previous typed prompt retained all required spans but was consistently longe
 
 ## Budget calibration
 
-The final prompt was swept over the six tuning traces using the production three-characters-per-token estimate:
+The final prompt was swept over the six tuning traces using the production three-characters-per-token estimate. The finer reliability sweep ran from `0.60` through `1.00` in steps of `0.04`:
 
-| `maxCompactionRatio` | Complete responses | Runtime accepted |
-|---:|---:|---:|
-| `0.38` | 0/6 | 0/6 |
-| `0.62` | 0/6 | 0/6 |
-| `1.00` | 6/6 | 6/6 |
+| `maxCompactionRatio` | Complete and accepted | Exact spans in generated output | Exact next action | Stored-thinking reduction |
+|---:|---:|---:|---:|---:|
+| `0.60` | 0/6 | 94/112 | 0/6 | 0.0% |
+| `0.64` | 0/6 | 95/112 | 0/6 | 0.0% |
+| `0.68` | 0/6 | 100/112 | 0/6 | 0.0% |
+| `0.72` | 1/6 | 100/112 | 1/6 | 5.5% |
+| `0.76` | 4/6 | 102/112 | 4/6 | 19.7% |
+| `0.80` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.84` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.88` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.92` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.96` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `1.00` | 6/6 | 103/112 | 6/6 | 24.0% |
 
-Both lower golden-ratio-inspired settings (`0.38` and `0.62`) truncated all six responses. Dense paths, punctuation, and code need the headroom provided by the conservative `ceil(C / 3)` estimate and the production ratio `1.0`. This increases generation headroom, not accepted storage: output must still complete, be non-empty, and be strictly shorter than the source. The sweep used the production `maxTraceChars: -1` default, so the lower-ratio failures were caused by generation truncation rather than the optional storage guardrail.
+Span counts for truncated responses measure partial generated text, not stored compact reasoning. Production rejected those outputs and retained the complete originals. `0.80` was the lowest ratio to complete all six fixtures in this run, but six synthetic traces do not establish a safe general threshold. The production ratio remains `1.0` to leave headroom for longer or less structured reasoning. This increases generation headroom, not accepted storage: output must still complete, be non-empty, and be strictly shorter than the source. The sweep used the production `maxTraceChars: -1` default, so failures below `0.80` were caused by generation truncation rather than the optional storage guardrail.
 
 ## Retention and storage effect
 
