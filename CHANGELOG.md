@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-06
+
+### Changed
+
+- Made the npm package self-inspectable without shipping development evidence: included the operational configuration and llama.cpp slot-pinning guides, kept benchmark artifacts and contributor tooling repository-only, removed the smoke harness from the tarball, clarified repository-only links, expanded local-model discovery keywords, and aligned the Pi peer dependency with Pi package guidance.
+- Documented every public setting beside its shipped TypeScript type, including its purpose, effect, accepted policy, and built-in default, so Pi and users can understand configuration directly from the installed source.
+
 ## [0.6.0] - 2026-08-06
 
 ### Added
@@ -174,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.3.0...v0.4.0

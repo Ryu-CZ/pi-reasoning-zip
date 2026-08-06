@@ -115,4 +115,4 @@ For a live multi-turn verification:
 3. Confirm the main request uses the configured main slot and the compactor uses the configured compactor slot.
 4. Compare prompt tokens newly evaluated on both follow-ups.
 
-One request pair proves separation but not cache reuse. The repository's measured multi-turn observations are in [Benchmark](benchmark.md).
+One request pair proves separation but not cache reuse. The repository's measured multi-turn observations are in [Benchmark](https://github.com/Ryu-CZ/pi-reasoning-zip/blob/main/docs/benchmark.md).

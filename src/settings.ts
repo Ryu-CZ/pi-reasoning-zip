@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { ReasoningZipMode, ReasoningZipSettings, ReasoningZipSlotMode } from "./types.js";
 
+/** Built-in values used whenever a field is omitted or fails validation. */
 export const DEFAULT_SETTINGS: ReasoningZipSettings = {
   enabled: true,
   mode: "local-only",

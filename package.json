@@ -1,6 +1,6 @@
 {
   "name": "pi-reasoning-zip",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": false,
   "description": "Compact reasoning blocks to keep the context short.",
   "license": "MIT",
@@ -12,7 +12,8 @@
     "dist",
     "src",
     "extensions",
-    "scripts/smoke-extension.mjs",
+    "docs/configuration.md",
+    "docs/llama-cpp-slot-pinning.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -24,7 +25,13 @@
     "reasoning",
     "thinking",
     "context",
-    "llama-cpp"
+    "context-compression",
+    "llama-cpp",
+    "llama.cpp",
+    "llamacpp",
+    "local-llm",
+    "openai-compatible",
+    "prompt-cache"
   ],
   "repository": {
     "type": "git",
@@ -51,7 +58,7 @@
     "smoke": "npm run build && node scripts/smoke-extension.mjs"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.3"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
