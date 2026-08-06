@@ -339,7 +339,7 @@ async function handleReasoningZipCommand(args: unknown, ctx: unknown): Promise<s
     return message;
   }
 
-  const message = "Usage: /reasoning-zip [status|on|off|enable|disable|toggle] [global|project]";
+  const message = "Usage: /zip [status|on|off|enable|disable|toggle] [global|project]";
   notify(ctx, message, "warning");
   return message;
 }
@@ -391,8 +391,12 @@ export default function reasoningZipExtension(pi: ExtensionAPI) {
   const pendingSlotProbes = new Map<string, Promise<number | undefined>>();
   const completedSlotProbes = new Map<string, { slotCount: number; expiresAt: number }>();
 
-  extension.registerCommand?.("reasoning-zip", {
+  extension.registerCommand?.("zip", {
     description: "Toggle pi-reasoning-zip on or off",
+    handler: handleReasoningZipCommand,
+  });
+  extension.registerCommand?.("reasoning-zip", {
+    description: "Deprecated alias for /zip",
     handler: handleReasoningZipCommand,
   });
 

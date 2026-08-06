@@ -54,18 +54,20 @@ async function writeGlobalSettings(cwd: string, settings: unknown): Promise<void
 }
 
 describe("extension entrypoint", () => {
-  it("registers hooks, footer lifecycle, and reasoning-zip command", () => {
+  it("registers hooks, footer lifecycle, and zip commands", () => {
     const { handlers, commands } = loadExtensionSurface();
     expect(handlers.has("session_start")).toBe(true);
     expect(handlers.has("session_shutdown")).toBe(true);
     expect(handlers.has("message_end")).toBe(true);
     expect(handlers.has("before_provider_request")).toBe(true);
+    expect(commands.has("zip")).toBe(true);
     expect(commands.has("reasoning-zip")).toBe(true);
+    expect(commands.get("reasoning-zip")).toBe(commands.get("zip"));
   });
 
-  it("reasoning-zip command maps enabled setting to project or global settings", async () => {
+  it("zip command maps enabled setting to project or global settings", async () => {
     const cwd = await tempProject({ mode: "all" });
-    const command = loadExtensionSurface().commands.get("reasoning-zip")!;
+    const command = loadExtensionSurface().commands.get("zip")!;
     const notifications: string[] = [];
     const statuses: Record<string, string | undefined> = {};
     process.env.PI_CODING_AGENT_DIR = join(cwd, "agent");

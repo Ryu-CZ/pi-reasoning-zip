@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Changed the bare `/reasoning-zip` command from a status display into a shortcut that toggles the extension on or off. Explicit `/reasoning-zip status` remains available.
+- Added `/zip` as the primary command and changed its bare invocation from a status display into a shortcut that toggles the extension on or off. Explicit `/zip status` remains available, and `/reasoning-zip` remains as a deprecated compatibility alias.
 
 ## [0.6.1] - 2026-08-06
 
