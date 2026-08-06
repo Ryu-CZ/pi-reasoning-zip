@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-06
+
 ### Added
 
 - Added compaction of eligible thinking in assistant messages that contain tool calls. Tool-call blocks remain unchanged.
@@ -172,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added package motto to README.
 - Added npm release metadata: description, keywords, repository links, exports, and Node engine.
 
-[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Ryu-CZ/pi-reasoning-zip/compare/v0.2.9...v0.3.0
