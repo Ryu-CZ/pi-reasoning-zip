@@ -38,52 +38,6 @@ It is usually not useful for hosted closed models that expose only opaque or alr
 3. If the result passes validation, Pi stores the compact block; otherwise it stores the original.
 4. Future turns replay what Pi stored. Earlier session entries are never rewritten.
 
-## Benchmark results
-
-The latest benchmark ran on 2026-08-06 with local `Qwen3.6-27B-UD-Q4_K_XL.gguf` and the current default settings. It used six examples while tuning and three new examples for a final check. The examples were hand-written to contain difficult details such as commands, numbers, failed attempts, rollback rules, uncertainties, and next steps. They are useful for comparison, but they are not real Pi sessions.
-
-### Current compression settings
-
-When compression fails a safety check, the original reasoning is kept. The results below count that original rather than pretending the failed compression was useful.
-
-| Set | Successful | Key details kept | Failed attempts kept | Correct next step | Before -> after | Thinking saved | Full session saved |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Tuning (6) | 6/6 | 103/112 | 15/16 | 6/6 | 12,687 -> 9,637 chars | 24.0% | 19.8% |
-| Frozen held-out (3) | 3/3 | 75/75 | 9/9 | 3/3 | 6,893 -> 5,829 chars | 15.4% | 12.6% |
-| **Combined (9)** | **9/9** | **178/187** | **24/25** | **9/9** | **19,580 -> 15,466 chars** | **21.0%** | **17.3%** |
-
-None of the selected outputs copied the fake instructions hidden in the source. Manual comparison found no changed important value, missing rollback rule, missing uncertainty, missing next step, or unsupported stronger claim. Nine key-detail checks missed because of harmless wording changes or because an obsolete corrected guess was omitted; one failed-attempt phrase also used different wording. These results cover only the nine tested examples and do not guarantee that every possible reasoning trace will be lossless.
-
-Compression took 56.6 seconds across the nine examples on this computer (6.3 seconds each on average), not including the separate next-step checks. This extra request delays the answer slightly; the space saving helps later turns that would otherwise reread the full reasoning.
-
-### Why these defaults
-
-On the three frozen held-out traces, the selected prompt kept 75/75 key details and 9/9 failed-attempt checks, copied none of the embedded fake instructions, and recovered the correct next step 3/3 times. The previous typed prompt kept 75/75 details but copied fake instructions in 2/3 traces and reduced thinking by only 8.8%. A plain terse control reduced thinking by 30.0% after rejected results were counted as originals, but kept only 34/75 details and recovered 1/3 next steps. A Caveman-inspired surface policy reduced thinking by 22.5% but kept 68/75 details, copied fake instructions in 3/3 traces, and recovered 2/3 next steps.
-
-An additional reliability sweep tested the current compression instructions from ratio `0.60` through `1.00` in steps of `0.04` on the six tuning examples:
-
-| `maxCompactionRatio` | Successful | Key details present | Correct next step | Stored thinking saved |
-|---:|---:|---:|---:|---:|
-| `0.60` | 0/6 | 94/112 | 0/6 | 0.0%* |
-| `0.64` | 0/6 | 95/112 | 0/6 | 0.0%* |
-| `0.68` | 0/6 | 100/112 | 0/6 | 0.0%* |
-| `0.72` | 1/6 | 100/112 | 1/6 | 5.5%* |
-| `0.76` | 4/6 | 102/112 | 4/6 | 19.7%* |
-| `0.80` | 6/6 | 103/112 | 6/6 | 24.0% |
-| `0.84` | 6/6 | 103/112 | 6/6 | 24.0% |
-| `0.88` | 6/6 | 103/112 | 6/6 | 24.0% |
-| `0.92` | 6/6 | 103/112 | 6/6 | 24.0% |
-| `0.96` | 6/6 | 103/112 | 6/6 | 24.0% |
-| `1.00` | 6/6 | 103/112 | 6/6 | 24.0% |
-
-> **How to read this:**
-> - **Key details** are important commands, paths, names, numbers, and conditions that should survive compression. The check is strict, so the same fact written differently may not count.
-> - **Correct next step** means another model could read only the shortened notes and still identify the exact action to take next. See the [technical definitions](https://github.com/Ryu-CZ/pi-reasoning-zip/blob/main/docs/benchmark.md#metric-glossary).
-> - `*` Some or all compacted outputs stopped before finishing and were rejected. The extension stored the original reasoning instead, so this percentage shows space saved in the actual session—not how short the rejected output was.
-
-The key-detail counts below `0.80` come from unfinished output that was never stored. The extension rejected it and kept the complete original, so no source information was lost but no space was saved. `0.80` was the lowest ratio that handled all six examples, but six hand-written examples are not enough to call it a safe default. `1.00` gives the model more room for longer or messier reasoning. The saved result must still finish and be shorter than the original.
-
-Only one model and computer setup were tested, and nobody independently repeated the manual review. Treat these numbers as a local example, not a promise for every model. See the full [technical benchmark report](https://github.com/Ryu-CZ/pi-reasoning-zip/blob/main/docs/benchmark.md), or run `npm run benchmark` against your own OpenAI-compatible model.
 
 ## Install
 
@@ -187,6 +141,54 @@ llama-server \
 `"auto"` probes `GET /slots` and pins only when the shared endpoint has at least two non-colliding slots. Use `true` only when you guarantee the topology; use `false` to disable pinning. Keep `/slots` on a trusted interface because it exposes runtime information.
 
 See [llama.cpp slot pinning](docs/llama-cpp-slot-pinning.md) for unified versus fixed KV, auto-mode safeguards, ID wrapping, edge cases, and verification.
+
+## Benchmark results
+
+The latest benchmark ran on 2026-08-06 with local `Qwen3.6-27B-UD-Q4_K_XL.gguf` and the current default settings. It used six examples while tuning and three new examples for a final check. The examples were hand-written to contain difficult details such as commands, numbers, failed attempts, rollback rules, uncertainties, and next steps. They are useful for comparison, but they are not real Pi sessions.
+
+### Current compression settings
+
+When compression fails a safety check, the original reasoning is kept. The results below count that original rather than pretending the failed compression was useful.
+
+| Set | Successful | Key details kept | Failed attempts kept | Correct next step | Before -> after | Thinking saved | Full session saved |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Tuning (6) | 6/6 | 103/112 | 15/16 | 6/6 | 12,687 -> 9,637 chars | 24.0% | 19.8% |
+| Frozen held-out (3) | 3/3 | 75/75 | 9/9 | 3/3 | 6,893 -> 5,829 chars | 15.4% | 12.6% |
+| **Combined (9)** | **9/9** | **178/187** | **24/25** | **9/9** | **19,580 -> 15,466 chars** | **21.0%** | **17.3%** |
+
+None of the selected outputs copied the fake instructions hidden in the source. Manual comparison found no changed important value, missing rollback rule, missing uncertainty, missing next step, or unsupported stronger claim. Nine key-detail checks missed because of harmless wording changes or because an obsolete corrected guess was omitted; one failed-attempt phrase also used different wording. These results cover only the nine tested examples and do not guarantee that every possible reasoning trace will be lossless.
+
+Compression took 56.6 seconds across the nine examples on this computer (6.3 seconds each on average), not including the separate next-step checks. This extra request delays the answer slightly; the space saving helps later turns that would otherwise reread the full reasoning.
+
+### Why these defaults
+
+On the three frozen held-out traces, the selected prompt kept 75/75 key details and 9/9 failed-attempt checks, copied none of the embedded fake instructions, and recovered the correct next step 3/3 times. The previous typed prompt kept 75/75 details but copied fake instructions in 2/3 traces and reduced thinking by only 8.8%. A plain terse control reduced thinking by 30.0% after rejected results were counted as originals, but kept only 34/75 details and recovered 1/3 next steps. A Caveman-inspired surface policy reduced thinking by 22.5% but kept 68/75 details, copied fake instructions in 3/3 traces, and recovered 2/3 next steps.
+
+An additional reliability sweep tested the current compression instructions from ratio `0.60` through `1.00` in steps of `0.04` on the six tuning examples:
+
+| `maxCompactionRatio` | Successful | Key details present | Correct next step | Stored thinking saved |
+|---:|---:|---:|---:|---:|
+| `0.60` | 0/6 | 94/112 | 0/6 | 0.0%* |
+| `0.64` | 0/6 | 95/112 | 0/6 | 0.0%* |
+| `0.68` | 0/6 | 100/112 | 0/6 | 0.0%* |
+| `0.72` | 1/6 | 100/112 | 1/6 | 5.5%* |
+| `0.76` | 4/6 | 102/112 | 4/6 | 19.7%* |
+| `0.80` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.84` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.88` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.92` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `0.96` | 6/6 | 103/112 | 6/6 | 24.0% |
+| `1.00` | 6/6 | 103/112 | 6/6 | 24.0% |
+
+> **How to read this:**
+> - **Key details** are important commands, paths, names, numbers, and conditions that should survive compression. The check is strict, so the same fact written differently may not count.
+> - **Correct next step** means another model could read only the shortened notes and still identify the exact action to take next. See the [technical definitions](https://github.com/Ryu-CZ/pi-reasoning-zip/blob/main/docs/benchmark.md#metric-glossary).
+> - `*` Some or all compacted outputs stopped before finishing and were rejected. The extension stored the original reasoning instead, so this percentage shows space saved in the actual session—not how short the rejected output was.
+
+The key-detail counts below `0.80` come from unfinished output that was never stored. The extension rejected it and kept the complete original, so no source information was lost but no space was saved. `0.80` was the lowest ratio that handled all six examples, but six hand-written examples are not enough to call it a safe default. `1.00` gives the model more room for longer or messier reasoning. The saved result must still finish and be shorter than the original.
+
+Only one model and computer setup were tested, and nobody independently repeated the manual review. Treat these numbers as a local example, not a promise for every model. See the full [technical benchmark report](https://github.com/Ryu-CZ/pi-reasoning-zip/blob/main/docs/benchmark.md), or run `npm run benchmark` against your own OpenAI-compatible model.
+
 
 ## Safety and limitations
 
