@@ -64,18 +64,54 @@ Add a minimal configuration to project `.pi/settings.json` or global `~/.pi/agen
     "mode": "local-only",
     "compactor": {
       "baseUrl": "http://127.0.0.1:8080/v1",
-      "model": "Qwen3.6-27B"
+      "model": "thinker"
     }
   }
 }
 ```
 
-For llama.cpp, a minimal local server example is:
+For `llama.cpp` you can try different models depends on your VRAM and personal preference. My full local server configuration is:
 
 ```bash
-llama-server \
-  --model /path/to/Qwen3.6-27B.gguf \
-  --alias Qwen3.6-27B
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="/mnt/m2-disk/ai"
+MODEL_PATH="$ROOT_DIR/models/Qwen3.6-27B-MTP-GGUF/Qwen3.6-27B-UD-Q4_K_XL.gguf"
+MODEL_PROJ="$ROOT_DIR/models/Qwen3.6-27B-MTP-GGUF/mmproj-F16.gguf"
+CTX_SIZE="43008"
+REASONING_BUDGET="8192"
+
+"$ROOT_DIR/llama.cpp/build-cuda/bin/llama-server" \
+  --model "$MODEL_PATH" \
+  --mmproj "$MODEL_PROJ" \
+  --alias "thinker" \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --seed 3407 \
+  --ctx-size $CTX_SIZE \
+  --fit off \
+  --jinja \
+  --chat-template-kwargs '{"preserve_thinking":true}' \
+  --reasoning-preserve \
+  --reasoning on \
+  --reasoning-format auto \
+  --reasoning-budget $REASONING_BUDGET \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --parallel 3 --kv-unified --slots --no-cache-idle-slots --batch-size 1024 --ubatch-size 512 \
+  -ngl 99 \
+  --flash-attn on \
+  --temp 0.59375 \
+  --top-p 0.953125 \
+  --top-k 20 \
+  --min-p 0.00 \
+  --spec-type draft-mtp \
+  --spec-draft-n-max 3 \
+  --spec-draft-p-min 0.703125 \
+  -t 16 \
+  -tb 16 \
+  --load-mode dio
 ```
 
 Toggle the extension and inspect the effective toggle source:
